@@ -1,16 +1,21 @@
 import json
 import time
+import textwrap
 from datetime import datetime, timedelta, timezone
 from coinbase.rest import RESTClient
 
-# Load credentials from the JSON file
+# Load and convert private key into PEM format
 with open("cdp_api_key.json") as f:
     key_data = json.load(f)
     API_KEY = key_data["id"]
-    API_SECRET = key_data["privateKey"]  # Already properly formatted PEM
+    base64_key = key_data["privateKey"]
 
-# Initialize Coinbase client
-client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
+    # Wrap the key to proper PEM format (64 characters per line)
+    wrapped_key = "\n".join(textwrap.wrap(base64_key, 64))
+    PEM_KEY = f"-----BEGIN PRIVATE KEY-----\n{wrapped_key}\n-----END PRIVATE KEY-----"
+
+# Initialize client
+client = RESTClient(api_key=API_KEY, api_secret=PEM_KEY)
 
 TRADING_PAIRS = ["XLM-USD", "XRP-USD", "LINK-USD", "OP-USD", "ARB-USD"]
 
