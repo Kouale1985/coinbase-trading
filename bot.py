@@ -1,7 +1,7 @@
 import os
 import asyncio
 import pandas as pd
-from coinbase_advanced_trade.client import AsyncCoinbaseAdvancedTradeClient
+from coinbase.advanced_trade.client import AsyncCoinbaseAdvancedTradeClient
 from datetime import datetime
 
 # Load from environment
