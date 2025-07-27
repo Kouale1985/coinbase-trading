@@ -1,7 +1,7 @@
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from coinbase.rest.rest_client import RESTClient
+from coinbase.rest import RESTClient  
 
 API_KEY = os.getenv("COINBASE_API_KEY_ID")
 API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
