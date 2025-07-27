@@ -1,7 +1,7 @@
 import os
 import asyncio
 import pandas as pd
-from coinbase.advanced_trade.client import AsyncCoinbaseAdvancedTradeClient
+from coinbase.rest.client import AsyncAdvancedTradeClient
 from datetime import datetime
 
 # Load from environment
@@ -12,7 +12,7 @@ SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 
 # ✅ This is the correct client instantiation
-client = AsyncCoinbaseAdvancedTradeClient(api_key=API_KEY, api_secret=API_SECRET)
+client = AsyncAdvancedTradeClient(api_key=API_KEY, api_secret=API_SECRET)
 
 async def fetch_data():
     for pair in TRADING_PAIRS:
