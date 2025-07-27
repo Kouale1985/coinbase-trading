@@ -1,7 +1,7 @@
 import os
 import time
 from datetime import datetime, timedelta
-from coinbase.rest import get_candles
+from coinbase.rest.market_data import get_candles
 
 TRADING_PAIRS = os.getenv("TRADING_PAIRS", "XLM-USD,XRP-USD,LINK-USD,OP-USD,ARB-USD").split(",")
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
