@@ -1,28 +1,32 @@
 import os
 import time
-from datetime import datetime, timedelta
-from coinbase.rest.market_data import get_candles
+from datetime import datetime, timedelta, timezone
+from coinbase.rest.rest_client import RESTClient
 
-TRADING_PAIRS = os.getenv("TRADING_PAIRS", "XLM-USD,XRP-USD,LINK-USD,OP-USD,ARB-USD").split(",")
-LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
+API_KEY = os.getenv("COINBASE_API_KEY_ID")
+API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
+
+client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
+
+TRADING_PAIRS = ["XLM-USD", "XRP-USD", "LINK-USD", "OP-USD", "ARB-USD"]
 
 def fetch_data():
-    end_time = datetime.utcnow()
-    start_time = end_time - timedelta(minutes=5)  # adjust if needed
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(minutes=5)
 
     for pair in TRADING_PAIRS:
-        candles = get_candles(
+        candles = client.get_candles(
             product_id=pair,
-            granularity="ONE_MINUTE",
-            start=start_time.isoformat() + "Z",
-            end=end_time.isoformat() + "Z"
+            start=start_time.isoformat(),
+            end=end_time.isoformat(),
+            granularity="ONE_MINUTE"
         )
-        print(f"{datetime.now()} | Fetched {len(candles.candles)} candles for {pair}")
+        print(f"{datetime.now()} | {pair}: {len(candles.candles)} candles")
 
 def main_loop():
     while True:
         fetch_data()
-        time.sleep(LOOP_SECONDS)
+        time.sleep(120)
 
 if __name__ == "__main__":
     main_loop()
