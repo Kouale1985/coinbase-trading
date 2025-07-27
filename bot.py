@@ -3,16 +3,30 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from coinbase.rest import RESTClient
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import serialization
+import base64
 
-# Load environment variables from .env
+# Load environment variables from .env or environment
 load_dotenv()
 
 API_KEY = os.getenv("COINBASE_API_KEY")
-API_SECRET = os.getenv("COINBASE_API_SECRET")
+RAW_SECRET = os.getenv("COINBASE_API_SECRET")
 
-# Strip "ed25519:" prefix if present
-if API_SECRET.startswith("ed25519:"):
-    API_SECRET = API_SECRET[len("ed25519:"):]
+# --- Ed25519 Key Parsing ---
+if RAW_SECRET.startswith("ed25519:"):
+    RAW_SECRET = RAW_SECRET.replace("ed25519:", "")
+
+try:
+    private_bytes = base64.b64decode(RAW_SECRET)
+    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_bytes)
+    API_SECRET = private_key.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption()
+    ).hex()
+except Exception as e:
+    raise ValueError(f"Failed to parse Ed25519 private key: {e}")
 
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
@@ -40,7 +54,6 @@ async def run_bot():
         except Exception as e:
             print(f"⚠️ Error processing {pair}: {e}")
 
-# Loop every 2 minutes
 async def main_loop():
     while True:
         await run_bot()
