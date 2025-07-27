@@ -1,74 +1,50 @@
-import json
-import time
+import os
 import asyncio
 from datetime import datetime, timedelta, timezone
-
+from dotenv import load_dotenv
 from coinbase.rest import RESTClient
-from strategy import should_buy, should_sell  # you must define this in strategy.py
-from trade_simulator import simulate_trade   # you must define this in trade_simulator.py
-from key_loader import load_ed25519_private_key  # NEW
 
-import logging
+# Load environment variables from .env
+load_dotenv()
 
-# Setup logging format to see timestamps and messages
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+API_KEY = os.getenv("COINBASE_API_KEY")
+API_SECRET = os.getenv("COINBASE_API_SECRET")
 
-# Load secrets
-with open("cdp_api_key.json") as f:
-    secret = json.load(f)
-
-API_KEY = secret["id"]
-raw_key = secret["privateKey"]
-API_SECRET = load_ed25519_private_key(raw_key)  # Use helper to load PEM format
+# Strip "ed25519:" prefix if present
+if API_SECRET.startswith("ed25519:"):
+    API_SECRET = API_SECRET[len("ed25519:"):]
 
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
+# Constants
+GRANULARITY = 60  # 1-minute candles
 TRADING_PAIRS = ["XLM-USD", "XRP-USD", "LINK-USD", "OP-USD", "ARB-USD"]
-GRANULARITY = "ONE_MINUTE"
 
 async def fetch_candles(pair):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=100)
-
-    logging.info(f"🔄 Fetching candles for {pair} from {start.isoformat()} to {now.isoformat()}")
-
-    try:
-        candles = await client.get_candles(
-            product_id=pair,
-            start=start.isoformat(),
-            end=now.isoformat(),
-            granularity=GRANULARITY
-        )
-        logging.info(f"✅ {pair}: {len(candles.candles)} candles fetched")
-        return candles
-    except Exception as e:
-        logging.error(f"❌ Failed to fetch candles for {pair}: {e}")
-        return None
-
-async def process_pair(pair):
-    try:
-        candles = await fetch_candles(pair)
-        if not candles or len(candles) < 20:
-            logging.warning(f"{pair} - Not enough data.")
-            return
-
-        if should_buy(candles):
-            logging.info(f"🟢 BUY signal for {pair}")
-            simulate_trade("buy", pair, candles[-1].close, 100)  # Adjust quantity as needed
-        elif should_sell(candles):
-            logging.info(f"🔴 SELL signal for {pair}")
-            simulate_trade("sell", pair, candles[-1].close, 100)
-        else:
-            logging.info(f"⚪ HOLD signal for {pair}")
-    except Exception as e:
-        logging.error(f"⚠️ Error processing {pair}: {e}")
+    candles = await client.get_candles(
+        product_id=pair,
+        start=start.isoformat(),
+        end=now.isoformat(),
+        granularity=GRANULARITY
+    )
+    return candles
 
 async def run_bot():
+    print(f"--- Running bot at {datetime.now(timezone.utc).isoformat()} ---")
+    for pair in TRADING_PAIRS:
+        try:
+            candles = await fetch_candles(pair)
+            print(f"✅ {pair}: Received {len(candles)} candles")
+        except Exception as e:
+            print(f"⚠️ Error processing {pair}: {e}")
+
+# Loop every 2 minutes
+async def main_loop():
     while True:
-        logging.info(f"\n--- Running bot at {datetime.now().isoformat()} ---")
-        tasks = [process_pair(pair) for pair in TRADING_PAIRS]
-        await asyncio.gather(*tasks)
+        await run_bot()
         await asyncio.sleep(120)
 
 if __name__ == "__main__":
-    asyncio.run(run_bot())
+    asyncio.run(main_loop())
