@@ -1,4 +1,4 @@
-coinbase-advanced-trade
+git+https://github.com/coinbase/coinbase-advanced-py.git
 python-dotenv
 aiohttp
 websockets
