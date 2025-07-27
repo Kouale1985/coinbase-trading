@@ -1,3 +1,5 @@
-git+https://github.com/coinbase/coinbase-advanced-trade-python.git
+git+https://github.com/coinbase/coinbase-advanced-py.git
 python-dotenv
-pandas
+aiohttp
+websockets
+cryptography
