@@ -7,6 +7,11 @@ from coinbase.rest import RESTClient
 from strategy import should_buy, should_sell  # you must define this in strategy.py
 from trade_simulator import simulate_trade   # you must define this in trade_simulator.py
 
+import logging
+
+# Setup logging format to see timestamps and messages
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+
 # Load secrets
 with open("cdp_api_key.json") as f:
     secret = json.load(f)
@@ -22,13 +27,21 @@ GRANULARITY = "ONE_MINUTE"
 async def fetch_candles(pair):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=100)
-    candles = await client.get_candles(
-        product_id=pair,
-        start=start.isoformat(),
-        end=now.isoformat(),
-        granularity=GRANULARITY
-    )
-    return candles.candles[::-1]  # most recent last
+
+    logging.info(f"🔄 Fetching candles for {pair} from {start.isoformat()} to {now.isoformat()}")
+
+    try:
+        candles = await client.get_candles(
+            product_id=pair,
+            start=start.isoformat(),
+            end=now.isoformat(),
+            granularity=GRANULARITY
+        )
+        logging.info(f"✅ {pair}: {len(candles.candles)} candles fetched")
+        return candles
+    except Exception as e:
+        logging.error(f"❌ Failed to fetch candles for {pair}: {e}")
+        return None
 
 async def process_pair(pair):
     try:
