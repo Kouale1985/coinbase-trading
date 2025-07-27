@@ -1,11 +1,15 @@
-import os
+import json
 import time
 from datetime import datetime, timedelta, timezone
-from coinbase.rest import RESTClient  
+from coinbase.rest import RESTClient
 
-API_KEY = os.getenv("COINBASE_API_KEY_ID")
-API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
+# Load credentials from the JSON file
+with open("cdp_api_key.json") as f:
+    key_data = json.load(f)
+    API_KEY = key_data["id"]
+    API_SECRET = key_data["privateKey"]  # Already properly formatted PEM
 
+# Initialize Coinbase client
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
 TRADING_PAIRS = ["XLM-USD", "XRP-USD", "LINK-USD", "OP-USD", "ARB-USD"]
