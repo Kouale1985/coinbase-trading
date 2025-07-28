@@ -1,27 +1,29 @@
 import os
+import json
 import asyncio
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 from coinbase.rest import RESTClient
 
-# Load environment variables from .env
-load_dotenv()
+# Load CDP API Key from mounted secret file
+json_path = "/etc/secrets/cdp_api_key.json"
+with open(json_path, "r") as f:
+    creds = json.load(f)
 
-API_KEY = os.getenv("COINBASE_API_KEY_ID")
-API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
+API_KEY = creds.get("id")
+API_SECRET = creds.get("privateKey")
 
 # Strip "ed25519:" prefix if present
 if API_SECRET and API_SECRET.startswith("ed25519:"):
     API_SECRET = API_SECRET[len("ed25519:"):]
 
 if not API_KEY or not API_SECRET:
-    raise ValueError("Missing API credentials. Check your .env file.")
+    raise ValueError("Missing API credentials from JSON secret.")
 
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
 # Constants
 GRANULARITY = 60  # 1-minute candles
-TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD").split(",")
+TRADING_PAIRS = os.getenv("TRADING_PAIRS", "XLM-USD,XRP-USD").split(",")
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
 
