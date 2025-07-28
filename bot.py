@@ -50,10 +50,13 @@ async def run_bot():
         except Exception as e:
             print(f"⚠️ Error processing {pair}: {e}")
 
+# Loop every 2 minutes
 async def main_loop():
+    print("🔄 Starting trading loop...")
     while True:
         await run_bot()
-        await asyncio.sleep(LOOP_SECONDS)
+        await asyncio.sleep(120)
 
 if __name__ == "__main__":
+    print("🚀 Launching bot.py...")
     asyncio.run(main_loop())
