@@ -1,38 +1,43 @@
 import os
+import sys
 import asyncio
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from coinbase.rest import RESTClient
 
-# Load environment variables from .env (optional for local dev)
-load_dotenv()
+# === DEBUG PRINTS: Confirm startup and env ===
+print("✅ bot.py loaded", flush=True)
 
-# --- Load API credentials ---
+load_dotenv()  # Safe even on Render; does nothing if .env isn't found
+
 API_KEY = os.getenv("COINBASE_API_KEY_ID")
 API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
 
-# Strip "ed25519:" prefix if present
+print(f"🔑 COINBASE_API_KEY_ID: {API_KEY}", flush=True)
+print(f"🔐 COINBASE_API_PRIVATE_KEY: {API_SECRET[:8]}...", flush=True)
+
+# === Strip "ed25519:" prefix if needed ===
 if API_SECRET and API_SECRET.startswith("ed25519:"):
     API_SECRET = API_SECRET[len("ed25519:"):]
 
-# Check for missing credentials
+# === Raise error if missing ===
 if not API_KEY or not API_SECRET:
     raise ValueError("Missing API credentials. Check your .env file or Render environment.")
 
-# Initialize Coinbase REST client
+# === Initialize client ===
+print("📡 Initializing REST client...", flush=True)
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
-# --- Bot Configuration ---
-GRANULARITY = 60  # 1-minute candles
+# === Config ===
+GRANULARITY = 60  # 1 min candles
 TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD").split(",")
-LOOP_SECONDS = 10  # shortened for debugging
+LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
 
-# --- Fetch historical candles ---
+# === Fetch candle data ===
 async def fetch_candles(pair):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=100)
-    print(f"📥 Fetching candles for {pair} from {start.isoformat()} to {now.isoformat()}")
     candles = await client.get_candles(
         product_id=pair,
         start=start.isoformat(),
@@ -41,32 +46,30 @@ async def fetch_candles(pair):
     )
     return candles
 
-# --- Simulate trade (for now) ---
+# === Simulate a trade (mock) ===
 async def simulate_trade(pair, candles):
-    print(f"📊 Simulating trade for {pair} | Last close: {candles[-1][4]}")
+    print(f"📊 Simulating trade for {pair} | Last close: {candles[-1][4]}", flush=True)
 
-# --- Run trading logic ---
+# === Core bot logic ===
 async def run_bot():
-    print(f"⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}")
+    print(f"⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
     for pair in TRADING_PAIRS:
         try:
             candles = await fetch_candles(pair)
-            print(f"✅ {pair}: Received {len(candles)} candles")
+            print(f"✅ {pair}: Received {len(candles)} candles", flush=True)
             if SIMULATION:
                 await simulate_trade(pair, candles)
         except Exception as e:
-            print(f"⚠️ Error processing {pair}: {e}")
+            print(f"⚠️ Error processing {pair}: {e}", flush=True)
 
-# --- Loop every N seconds ---
+# === Main loop ===
 async def main_loop():
-    print("🔄 Starting trading loop...")
+    print("🔄 Starting trading loop...", flush=True)
     while True:
         await run_bot()
         await asyncio.sleep(LOOP_SECONDS)
 
-# --- Entry point ---
-import sys
-
+# === Entry point ===
 if __name__ == "__main__":
     print("🚀 Launching bot.py...", flush=True)
     try:
@@ -74,4 +77,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Fatal error: {e}", flush=True)
         sys.exit(1)
-
