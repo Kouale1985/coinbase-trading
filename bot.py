@@ -65,9 +65,13 @@ async def main_loop():
         await asyncio.sleep(LOOP_SECONDS)
 
 # --- Entry point ---
+import sys
+
 if __name__ == "__main__":
-    print("🚀 Launching bot.py...")
+    print("🚀 Launching bot.py...", flush=True)
     try:
         asyncio.run(main_loop())
     except Exception as e:
-        print(f"❌ Fatal error: {e}")
+        print(f"❌ Fatal error: {e}", flush=True)
+        sys.exit(1)
+
