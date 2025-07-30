@@ -25,13 +25,14 @@ client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 # --- Bot Configuration ---
 GRANULARITY = 60  # 1-minute candles
 TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD").split(",")
-LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
+LOOP_SECONDS = 10  # shortened for debugging
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
 
 # --- Fetch historical candles ---
 async def fetch_candles(pair):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=100)
+    print(f"📥 Fetching candles for {pair} from {start.isoformat()} to {now.isoformat()}")
     candles = await client.get_candles(
         product_id=pair,
         start=start.isoformat(),
