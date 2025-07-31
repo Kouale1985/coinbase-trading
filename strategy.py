@@ -124,17 +124,21 @@ def enhanced_should_buy(candles, current_price):
     # 1. RSI Filter
     current_rsi = rsi(closes)
     if current_rsi is None or current_rsi >= 30:
-        return False, f"RSI not oversold: {current_rsi:.2f if current_rsi else 'N/A'}"
+        rsi_display = current_rsi if current_rsi is not None else "N/A"
+        return False, f"RSI not oversold: {rsi_display:.2f}" if current_rsi is not None else f"RSI not oversold: {rsi_display}"
     
     # 2. EMA Trend Filter
     ema_50 = ema(closes, 50)
     if ema_50 is None or current_price <= ema_50:
-        return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f if ema_50 else 'N/A'}"
+        ema_display = ema_50 if ema_50 is not None else "N/A"
+        return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}" if ema_50 is not None else f"Price below 50 EMA: ${current_price:.6f} <= {ema_display}"
     
     # 3. MACD Momentum Filter
     macd_line, signal_line, _ = macd(closes)
     if macd_line is None or signal_line is None or macd_line <= signal_line:
-        return False, f"MACD not bullish: {macd_line:.6f if macd_line else 'N/A'} <= {signal_line:.6f if signal_line else 'N/A'}"
+        macd_display = f"{macd_line:.6f}" if macd_line is not None else "N/A"
+        signal_display = f"{signal_line:.6f}" if signal_line is not None else "N/A"
+        return False, f"MACD not bullish: {macd_display} <= {signal_display}"
     
     # 4. Volatility Filter (ATR)
     current_atr = atr(highs, lows, closes)
@@ -182,7 +186,7 @@ def enhanced_should_sell(candles, current_price, entry_price):
         if current_price <= atr_stop_loss:
             return True, "SELL (ATR STOP)", f"ATR stop triggered: ${current_price:.6f} <= ${atr_stop_loss:.6f}"
     
-    return False, "HOLD", f"No sell conditions met - RSI: {current_rsi:.2f if current_rsi else 'N/A'}"
+    return False, "HOLD", f"No sell conditions met - RSI: {current_rsi:.2f}" if current_rsi is not None else "No sell conditions met - RSI: N/A"
 
 def get_atr_stop_loss(candles, entry_price, multiplier=1.5):
     """Calculate ATR-based stop loss price"""
