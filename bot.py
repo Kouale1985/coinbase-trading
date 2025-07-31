@@ -123,15 +123,15 @@ def commit_data_to_github():
                               capture_output=True, text=True)
         
         if result.returncode == 0:
-                    # Push to GitHub
-        push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
-        if push_result.returncode == 0:
-            print(f"✅ Data successfully committed and pushed to GitHub")
-            return True
-        else:
-            print(f"⚠️ Git push failed: {push_result.stderr}")
-            print(f"📊 Continuing with local data export (dashboard will use cached data)")
-            return False
+            # Push to GitHub
+            push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            if push_result.returncode == 0:
+                print(f"✅ Data successfully committed and pushed to GitHub")
+                return True
+            else:
+                print(f"⚠️ Git push failed: {push_result.stderr}")
+                print(f"📊 Continuing with local data export (dashboard will use cached data)")
+                return False
         else:
             # No changes to commit (data unchanged)
             if "nothing to commit" in result.stdout:
