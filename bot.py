@@ -106,6 +106,10 @@ def commit_data_to_github():
                           capture_output=True, text=True, check=False)
             subprocess.run(['git', 'remote', 'add', 'origin', remote_url], 
                           capture_output=True, text=True, check=False)
+            
+            # Ensure we're on main branch (fix detached HEAD)
+            subprocess.run(['git', 'checkout', '-B', 'main'], 
+                          capture_output=True, text=True, check=False)
             print(f"🔧 Git remote configured with GitHub token")
         
         # Add the data files (create directory first if needed)
