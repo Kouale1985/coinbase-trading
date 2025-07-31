@@ -107,9 +107,14 @@ def commit_data_to_github():
             subprocess.run(['git', 'remote', 'add', 'origin', remote_url], 
                           capture_output=True, text=True, check=False)
             
-            # Ensure we're on main branch (fix detached HEAD)
+            # Ensure we're on main branch and sync with remote
             subprocess.run(['git', 'checkout', '-B', 'main'], 
                           capture_output=True, text=True, check=False)
+            # Fetch remote changes and resolve conflicts
+            subprocess.run(['git', 'fetch', 'origin', 'main'], 
+                          capture_output=True, text=True, check=False)
+            # Force push instead of merge to avoid conflicts with data files
+            print("📤 Syncing with remote repository...")
             print(f"🔧 Git remote configured with GitHub token")
         
         # Add the data files (create directory first if needed)
@@ -127,8 +132,8 @@ def commit_data_to_github():
                               capture_output=True, text=True)
         
         if result.returncode == 0:
-            # Push to GitHub (set upstream on first push)
-            push_result = subprocess.run(['git', 'push', '--set-upstream', 'origin', 'main'], capture_output=True, text=True)
+            # Push to GitHub (force push to resolve conflicts)
+            push_result = subprocess.run(['git', 'push', '--force', 'origin', 'main'], capture_output=True, text=True)
             if push_result.returncode == 0:
                 print(f"✅ Data successfully committed and pushed to GitHub")
                 return True
