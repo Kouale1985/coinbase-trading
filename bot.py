@@ -9,25 +9,97 @@ from coinbase.rest import RESTClient
 from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss
 from config import CONFIG
 
-# === Position Tracking Class ===
+# === Professional Portfolio Management Constants ===
+STARTING_BALANCE_USD = 1000
+MAX_POSITIONS = 4                   # Don't hold more than 4 trades at once
+MAX_EXPOSURE = 0.75                 # Use up to 75% of total balance
+CASH_BUFFER = 0.25                  # Keep at least 25% cash free
+MAX_PER_TRADE = 0.25                # No more than 25% per trade
+MIN_TRADE_SIZE = 50                 # Don't enter trades smaller than this
+RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
+
+# === Position Tracking Class with Portfolio Management ===
 class PositionTracker:
     def __init__(self):
         self.positions = {}  # {pair: {"entry_price": price, "quantity": qty, "timestamp": time}}
         self.trade_history = []
         self.total_pnl = 0.0
+        self.cash_balance = STARTING_BALANCE_USD
+        self.starting_balance = STARTING_BALANCE_USD
         
-    def open_position(self, pair, price, quantity=None):
-        """Open a new position"""
-        if quantity is None:
-            quantity = 10.00 / price  # $10 worth of crypto
+    def calculate_total_balance(self):
+        """Calculate total portfolio value (cash + positions)"""
+        position_value = sum(
+            pos["entry_price"] * pos["quantity"] for pos in self.positions.values()
+        )
+        return self.cash_balance + position_value
+        
+    def calculate_position_size(self, price, atr_value=None):
+        """
+        Calculate optimal position size based on portfolio management rules
+        """
+        total_balance = self.calculate_total_balance()
+        
+        # Check max positions limit
+        if len(self.positions) >= MAX_POSITIONS:
+            return 0, "Max positions reached"
+        
+        # Calculate current exposure
+        used_exposure = total_balance - self.cash_balance
+        available_exposure = MAX_EXPOSURE * total_balance - used_exposure
+        
+        # Max allowed per trade
+        max_trade_usd = min(available_exposure, MAX_PER_TRADE * total_balance)
+        
+        # Check minimum trade size
+        if max_trade_usd < MIN_TRADE_SIZE:
+            return 0, f"Trade size too small: ${max_trade_usd:.2f} < ${MIN_TRADE_SIZE}"
+        
+        # Check cash availability
+        if max_trade_usd > self.cash_balance:
+            max_trade_usd = self.cash_balance
+        
+        # Optional: ATR-based position sizing for risk management
+        if atr_value and atr_value > 0:
+            stop_loss_pct = 1.5 * atr_value / price
+            if stop_loss_pct > 0:
+                risk_usd = total_balance * RISK_PER_TRADE
+                risk_based_position_usd = risk_usd / stop_loss_pct
+                max_trade_usd = min(max_trade_usd, risk_based_position_usd)
+        
+        quantity = max_trade_usd / price
+        return quantity, f"Position size: ${max_trade_usd:.2f} ({quantity:.6f} units)"
+        
+    def open_position(self, pair, price, atr_value=None):
+        """Open a new position with professional position sizing"""
+        quantity, reason = self.calculate_position_size(price, atr_value)
+        
+        if quantity <= 0:
+            print(f"⚠️ Cannot open position for {pair}: {reason}", flush=True)
+            return False
             
+        trade_value = quantity * price
+        
+        # Check if we have enough cash
+        if trade_value > self.cash_balance:
+            print(f"⚠️ Insufficient cash for {pair}: Need ${trade_value:.2f}, have ${self.cash_balance:.2f}", flush=True)
+            return False
+            
+        # Execute the trade
         self.positions[pair] = {
             "entry_price": price,
             "quantity": quantity,
             "timestamp": datetime.now(timezone.utc),
             "unrealized_pnl": 0.0
         }
-        print(f"🟢 OPENED POSITION: {pair} | Entry: ${price:.6f} | Qty: {quantity:.6f}", flush=True)
+        
+        # Update cash balance
+        self.cash_balance -= trade_value
+        
+        total_balance = self.calculate_total_balance()
+        print(f"🟢 OPENED POSITION: {pair} | Entry: ${price:.6f} | Qty: {quantity:.6f} | Value: ${trade_value:.2f}", flush=True)
+        print(f"   💰 Cash: ${self.cash_balance:.2f} | Total Balance: ${total_balance:.2f} | Positions: {len(self.positions)}/{MAX_POSITIONS}", flush=True)
+        return True
         
     def close_position(self, pair, exit_price, reason="SELL"):
         """Close an existing position and calculate PnL"""
@@ -38,6 +110,9 @@ class PositionTracker:
         position = self.positions[pair]
         entry_price = position["entry_price"]
         quantity = position["quantity"]
+        
+        # Calculate sale proceeds
+        sale_proceeds = exit_price * quantity
         
         # Calculate PnL
         pnl_usd = (exit_price - entry_price) * quantity
@@ -61,9 +136,15 @@ class PositionTracker:
         # Remove from open positions
         del self.positions[pair]
         
+        # Update cash balance with sale proceeds
+        self.cash_balance += sale_proceeds
+        
+        total_balance = self.calculate_total_balance()
+        
         # Log the trade
         profit_emoji = "💰" if pnl_usd > 0 else "📉"
         print(f"🔴 CLOSED POSITION: {pair} | Exit: ${exit_price:.6f} | {profit_emoji} PnL: ${pnl_usd:.2f} ({pnl_percent:+.2f}%)", flush=True)
+        print(f"   💰 Sale Proceeds: ${sale_proceeds:.2f} | Cash: ${self.cash_balance:.2f} | Total: ${total_balance:.2f}", flush=True)
         
         return pnl_usd
         
@@ -81,22 +162,43 @@ class PositionTracker:
         return self.positions.get(pair, None)
         
     def print_summary(self):
-        """Print trading summary"""
+        """Print comprehensive portfolio summary"""
         open_positions = len(self.positions)
         total_trades = len(self.trade_history)
         winning_trades = len([t for t in self.trade_history if t["pnl_usd"] > 0])
         
-        print(f"\n📊 TRADING SUMMARY:", flush=True)
-        print(f"   💼 Open Positions: {open_positions}", flush=True)
+        total_balance = self.calculate_total_balance()
+        position_value = total_balance - self.cash_balance
+        cash_percentage = (self.cash_balance / total_balance) * 100 if total_balance > 0 else 0
+        exposure_percentage = (position_value / total_balance) * 100 if total_balance > 0 else 0
+        total_return = ((total_balance - self.starting_balance) / self.starting_balance) * 100
+        
+        print(f"\n📊 PORTFOLIO SUMMARY:", flush=True)
+        print(f"   💰 Starting Balance: ${self.starting_balance:.2f}", flush=True)
+        print(f"   💰 Current Cash: ${self.cash_balance:.2f} ({cash_percentage:.1f}%)", flush=True)
+        print(f"   📈 Position Value: ${position_value:.2f} ({exposure_percentage:.1f}%)", flush=True)
+        print(f"   💰 Total Balance: ${total_balance:.2f}", flush=True)
+        print(f"   📊 Total Return: {total_return:+.2f}%", flush=True)
+        print(f"   📈 Realized PnL: ${self.total_pnl:.2f}", flush=True)
+        
+        print(f"\n📊 TRADING STATISTICS:", flush=True)
+        print(f"   💼 Open Positions: {open_positions}/{MAX_POSITIONS}", flush=True)
         print(f"   📈 Total Trades: {total_trades}", flush=True)
         print(f"   🎯 Winning Trades: {winning_trades}/{total_trades}" + (f" ({winning_trades/total_trades*100:.1f}%)" if total_trades > 0 else ""), flush=True)
-        print(f"   💰 Total PnL: ${self.total_pnl:.2f}", flush=True)
+        
+        print(f"\n📊 RISK MANAGEMENT:", flush=True)
+        print(f"   💰 Available Cash: ${self.cash_balance:.2f}", flush=True)
+        print(f"   📊 Portfolio Exposure: {exposure_percentage:.1f}% (max {MAX_EXPOSURE*100:.0f}%)", flush=True)
+        print(f"   📊 Max Per Trade: {MAX_PER_TRADE*100:.0f}% (${total_balance * MAX_PER_TRADE:.0f})", flush=True)
+        print(f"   📊 Min Trade Size: ${MIN_TRADE_SIZE}", flush=True)
         
         if self.positions:
-            print(f"   📋 Open Positions:", flush=True)
+            print(f"\n📋 OPEN POSITIONS:", flush=True)
             for pair, pos in self.positions.items():
                 unrealized = pos.get("unrealized_pnl", 0)
-                print(f"      {pair}: ${pos['entry_price']:.6f} | Unrealized: ${unrealized:.2f}", flush=True)
+                position_value = pos["entry_price"] * pos["quantity"]
+                percentage = (position_value / total_balance) * 100
+                print(f"      {pair}: ${pos['entry_price']:.6f} | Value: ${position_value:.2f} ({percentage:.1f}%) | Unrealized: ${unrealized:.2f}", flush=True)
 
 # Initialize position tracker
 position_tracker = PositionTracker()
@@ -324,8 +426,24 @@ def analyze_and_trade(pair, candles):
         # Execute trades
         if SIMULATION:
             if action == "BUY":
-                position_tracker.open_position(pair, current_price)
-                print(f"🧪 SIMULATION - BUY executed for {pair} at ${current_price:.6f}", flush=True)
+                # Get ATR value for position sizing
+                if hasattr(candles, 'candles') and candles.candles:
+                    candle_data = candles.candles
+                else:
+                    candle_data = candles
+                    
+                try:
+                    closes = [float(c.close) for c in candle_data]
+                    highs = [float(c.high) for c in candle_data]
+                    lows = [float(c.low) for c in candle_data]
+                    from strategy import atr
+                    current_atr = atr(highs, lows, closes)
+                except:
+                    current_atr = None
+                
+                success = position_tracker.open_position(pair, current_price, current_atr)
+                if success:
+                    print(f"🧪 SIMULATION - BUY executed for {pair} at ${current_price:.6f}", flush=True)
             elif action.startswith("SELL"):
                 pnl = position_tracker.close_position(pair, current_price, reason=action)
                 print(f"🧪 SIMULATION - {action} executed for {pair} at ${current_price:.6f}", flush=True)
@@ -334,13 +452,35 @@ def analyze_and_trade(pair, candles):
             if action == "BUY":
                 print(f"🚨 LIVE TRADING - BUY signal for {pair} at ${current_price:.6f}", flush=True)
                 try:
-                    order_result = client.market_order_buy(
-                        client_order_id=f"buy_{pair}_{int(datetime.now().timestamp())}",
-                        product_id=pair,
-                        quote_size="10.00"
-                    )
-                    print(f"✅ BUY ORDER PLACED: {order_result.order_id}", flush=True)
-                    position_tracker.open_position(pair, current_price)
+                    # Get ATR value for position sizing
+                    if hasattr(candles, 'candles') and candles.candles:
+                        candle_data = candles.candles
+                    else:
+                        candle_data = candles
+                        
+                    try:
+                        closes = [float(c.close) for c in candle_data]
+                        highs = [float(c.high) for c in candle_data]
+                        lows = [float(c.low) for c in candle_data]
+                        from strategy import atr
+                        current_atr = atr(highs, lows, closes)
+                    except:
+                        current_atr = None
+                    
+                    # Calculate position size using portfolio management
+                    quantity, sizing_reason = position_tracker.calculate_position_size(current_price, current_atr)
+                    
+                    if quantity <= 0:
+                        print(f"⚠️ Cannot place order: {sizing_reason}", flush=True)
+                    else:
+                        trade_value = quantity * current_price
+                        order_result = client.market_order_buy(
+                            client_order_id=f"buy_{pair}_{int(datetime.now().timestamp())}",
+                            product_id=pair,
+                            quote_size=str(trade_value)
+                        )
+                        print(f"✅ BUY ORDER PLACED: {order_result.order_id}", flush=True)
+                        position_tracker.open_position(pair, current_price, current_atr)
                     
                 except Exception as e:
                     print(f"❌ BUY ORDER FAILED for {pair}: {e}", flush=True)
