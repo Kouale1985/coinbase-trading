@@ -4,7 +4,6 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from coinbase.rest import RESTClient
-from coinbase.rest.types.product_types import Granularity
 
 # === DEBUG PRINTS: Confirm startup and env ===
 print("✅ bot.py loaded", flush=True)
@@ -30,7 +29,7 @@ print("📡 Initializing REST client...", flush=True)
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
 # === Config ===
-GRANULARITY = Granularity.ONE_MINUTE  # Use the enum instead of 60
+GRANULARITY = "ONE_MINUTE"  # Use string value instead of enum
 TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD,LINK-USD,OP-USD,ARB-USD").split(",")
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
