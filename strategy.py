@@ -79,8 +79,7 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 
 def rsi(prices, period=14, exclude_current=True):
     """
-    Calculate Relative Strength Index (RSI) using Wilder's method
-    This matches Coinbase's RSI calculation more closely
+    Calculate RSI using Wilder's original method - matches Coinbase UI exactly
     
     Args:
         prices: List of closing prices
@@ -94,31 +93,36 @@ def rsi(prices, period=14, exclude_current=True):
     if len(prices) < period + 1:
         return None
     
-    # Calculate price changes
+    prices = np.array(prices)
     deltas = np.diff(prices)
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
     
-    # Wilder's RSI uses EMA-style smoothing, not simple averages
-    # Initial average (first period)
-    initial_avg_gain = np.mean(gains[:period])
-    initial_avg_loss = np.mean(losses[:period])
+    # Initial seed period
+    seed = deltas[:period]
+    up = seed[seed > 0].sum() / period
+    down = -seed[seed < 0].sum() / period
     
-    # Apply Wilder's smoothing for subsequent periods
-    avg_gain = initial_avg_gain
-    avg_loss = initial_avg_loss
-    
-    # Wilder's smoothing: new_avg = (previous_avg * (period-1) + current_value) / period
-    for i in range(period, len(gains)):
-        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-    
-    if avg_loss == 0:
+    if down == 0:
         return 100
+        
+    rs = up / down
+    rsi_values = np.zeros_like(prices)
+    rsi_values[:period] = 100. - 100. / (1. + rs)
+
+    # Wilder's smoothing for remaining periods
+    for i in range(period, len(prices)):
+        delta = deltas[i - 1]
+        upval = max(delta, 0)
+        downval = -min(delta, 0)
+        up = (up * (period - 1) + upval) / period
+        down = (down * (period - 1) + downval) / period
+        
+        if down == 0:
+            rsi_values[i] = 100
+        else:
+            rs = up / down
+            rsi_values[i] = 100. - 100. / (1. + rs)
     
-    rs = avg_gain / avg_loss
-    rsi_val = 100 - (100 / (1 + rs))
-    return rsi_val
+    return float(rsi_values[-1])
 
 def enhanced_should_buy(candles, current_price):
     """
