@@ -5,7 +5,8 @@ import base64
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from coinbase.rest import RESTClient
-from strategy import rsi, should_buy, should_sell
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 # === DEBUG PRINTS: Confirm startup and env ===
 print("✅ bot.py loaded", flush=True)
@@ -18,45 +19,65 @@ API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
 print(f"🔑 COINBASE_API_KEY_ID: {API_KEY}", flush=True)
 print(f"🔐 COINBASE_API_PRIVATE_KEY: {API_SECRET[:8]}...", flush=True)
 
-def convert_base64_to_pem(base64_key):
-    """Convert base64-encoded private key to PEM format"""
-    # Remove ed25519: prefix if present
-    if base64_key.startswith("ed25519:"):
-        base64_key = base64_key[len("ed25519:"):]
-    
-    # Add base64 padding if needed
-    missing_padding = len(base64_key) % 4
-    if missing_padding:
-        base64_key += "=" * (4 - missing_padding)
-    
+# === Convert base64 Ed25519 key to PEM format ===
+def convert_ed25519_to_pem(encoded_key):
+    """Convert base64-encoded Ed25519 key to PEM format"""
     try:
-        # Decode base64
-        raw_bytes = base64.b64decode(base64_key)
+        print(f"🔍 Input key length: {len(encoded_key)}", flush=True)
         
-        # Ensure we have at least 32 bytes for Ed25519
+        # Strip "ed25519:" prefix if present
+        if encoded_key.startswith("ed25519:"):
+            encoded_key = encoded_key[len("ed25519:"):]
+            print("🔧 Stripped 'ed25519:' prefix", flush=True)
+        
+        # Clean up any whitespace or newlines
+        encoded_key = encoded_key.strip()
+        
+        # Add base64 padding if needed
+        missing_padding = len(encoded_key) % 4
+        if missing_padding:
+            encoded_key += "=" * (4 - missing_padding)
+            print(f"🔧 Added {4 - missing_padding} padding characters", flush=True)
+        
+        print(f"🔍 Cleaned key length: {len(encoded_key)}", flush=True)
+        
+        # Decode the base64 key
+        raw_bytes = base64.b64decode(encoded_key)
+        print(f"🔍 Decoded bytes length: {len(raw_bytes)}", flush=True)
+        
         if len(raw_bytes) < 32:
-            raise ValueError(f"Key too short: got {len(raw_bytes)} bytes")
+            raise ValueError(f"Key too short: got {len(raw_bytes)} bytes, expected at least 32")
         
-        # Take first 32 bytes for Ed25519 private key
+        # Use first 32 bytes as the private key
         private_key_bytes = raw_bytes[:32]
         
-        # Convert to PEM format
-        pem_key = f"""-----BEGIN PRIVATE KEY-----
-{base64.b64encode(private_key_bytes).decode('utf-8')}
------END PRIVATE KEY-----"""
+        # Create Ed25519 private key object
+        private_key = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+        print("✅ Successfully created Ed25519 private key object", flush=True)
         
-        return pem_key
+        # Convert to PEM format
+        pem_key = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        
+        pem_string = pem_key.decode('utf-8')
+        print("✅ Successfully converted to PEM format", flush=True)
+        print(f"🔍 PEM key starts with: {pem_string[:50]}...", flush=True)
+        
+        return pem_string
+        
     except Exception as e:
-        raise ValueError(f"Failed to convert key to PEM format: {e}")
-
-# === Convert API secret to PEM format ===
-if API_SECRET:
-    try:
-        API_SECRET = convert_base64_to_pem(API_SECRET)
-        print("✅ Successfully converted private key to PEM format", flush=True)
-    except Exception as e:
-        print(f"❌ Failed to convert private key: {e}", flush=True)
+        print(f"❌ Error converting key to PEM: {e}", flush=True)
+        print(f"🔍 Key sample (first 20 chars): {encoded_key[:20] if encoded_key else 'None'}", flush=True)
         raise
+
+# === Process the API secret ===
+if API_SECRET:
+    print("🔄 Converting Ed25519 key to PEM format...", flush=True)
+    API_SECRET = convert_ed25519_to_pem(API_SECRET)
+    print("✅ Key converted to PEM format", flush=True)
 
 # === Raise error if missing ===
 if not API_KEY or not API_SECRET:
@@ -67,113 +88,38 @@ print("📡 Initializing REST client...", flush=True)
 client = RESTClient(api_key=API_KEY, api_secret=API_SECRET)
 
 # === Config ===
-GRANULARITY = "ONE_MINUTE"  # Use string instead of 60
-TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD,LINK-USD,OP-USD,ARB-USD").split(",")
+GRANULARITY = 60  # 1 min candles
+TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD").split(",")
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
-
-# === Trading state ===
-portfolio = {
-    "USD": 100000,  # starting balance
-    "positions": {},
-    "total_trades": 0,
-    "winning_trades": 0,
-    "total_pnl": 0.0
-}
 
 # === Fetch candle data ===
 async def fetch_candles(pair):
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=100)
-    
-    print(f"🔍 Fetching candles for {pair}:", flush=True)
-    print(f"   - start: {start.isoformat()}", flush=True)
-    print(f"   - end: {now.isoformat()}", flush=True)
-    print(f"   - granularity: {GRANULARITY}", flush=True)
-    
     candles = await client.get_candles(
         product_id=pair,
         start=start.isoformat(),
         end=now.isoformat(),
         granularity=GRANULARITY
     )
-    
-    print(f"✅ {pair}: Received candles response - Type: {type(candles)}", flush=True)
-    print(f"   - Candles attribute exists with {len(candles)} items", flush=True)
-    
     return candles
 
-# === Calculate RSI and make trading decision ===
-def analyze_and_decide(pair, candles):
-    if len(candles) < 14:
-        print(f"⚠️ {pair}: Not enough data for RSI calculation", flush=True)
-        return "HOLD"
-    
-    # Extract closing prices
-    closes = [float(candle.close) for candle in candles]
-    current_price = closes[-1]
-    
-    # Calculate RSI
-    rsi_values = rsi(closes)
-    current_rsi = rsi_values[-1] if rsi_values else 50
-    
-    # Make trading decision
-    if should_buy(candles):
-        action = "BUY"
-    elif should_sell(candles):
-        action = "SELL"
-    else:
-        action = "HOLD"
-    
-    print(f"📊 {pair}: ${current_price:.6f} | RSI: {current_rsi:.2f} | Action: {action}", flush=True)
-    
-    return action
-
-# === Simulate trading ===
-def simulate_trade(pair, action, price):
-    if action == "BUY" and portfolio["USD"] > 0:
-        # Simulate buying with 10% of available USD
-        buy_amount = portfolio["USD"] * 0.1
-        quantity = buy_amount / price
-        portfolio["USD"] -= buy_amount
-        portfolio["positions"][pair] = portfolio["positions"].get(pair, 0) + quantity
-        portfolio["total_trades"] += 1
-        print(f"💰 [SIM] Bought {quantity:.4f} {pair} at ${price:.6f}", flush=True)
-        
-    elif action == "SELL" and portfolio["positions"].get(pair, 0) > 0:
-        # Simulate selling all holdings
-        quantity = portfolio["positions"][pair]
-        sell_amount = quantity * price
-        portfolio["USD"] += sell_amount
-        portfolio["positions"][pair] = 0
-        portfolio["total_trades"] += 1
-        print(f"💰 [SIM] Sold {quantity:.4f} {pair} at ${price:.6f}", flush=True)
-
-# === Print trading summary ===
-def print_summary():
-    print(f"📊 TRADING SUMMARY:", flush=True)
-    print(f"   💼 Open Positions: {len([p for p in portfolio['positions'].values() if p > 0])}", flush=True)
-    print(f"   📈 Total Trades: {portfolio['total_trades']}", flush=True)
-    print(f"   🎯 Winning Trades: {portfolio['winning_trades']}/{portfolio['total_trades']}", flush=True)
-    print(f"   💰 Total PnL: ${portfolio['total_pnl']:.2f}", flush=True)
+# === Simulate a trade (mock) ===
+async def simulate_trade(pair, candles):
+    print(f"📊 Simulating trade for {pair} | Last close: {candles[-1][4]}", flush=True)
 
 # === Core bot logic ===
 async def run_bot():
     print(f"⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
-    
     for pair in TRADING_PAIRS:
         try:
             candles = await fetch_candles(pair)
-            action = analyze_and_decide(pair, candles)
-            
-            if SIMULATION and action in ["BUY", "SELL"]:
-                current_price = float(candles[-1].close)
-                simulate_trade(pair, action, current_price)
-                
+            print(f"✅ {pair}: Received {len(candles)} candles", flush=True)
+            if SIMULATION:
+                await simulate_trade(pair, candles)
         except Exception as e:
             print(f"⚠️ Error processing {pair}: {e}", flush=True)
-    
-    print_summary()
 
 # === Main loop ===
 async def main_loop():
