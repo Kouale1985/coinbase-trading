@@ -104,15 +104,16 @@ def enhanced_should_buy(candles, current_price):
     3. MACD line > signal line (momentum)
     4. ATR < 3% of price (not too volatile)
     """
-    if not candles or len(candles) < 50:
-        return False, "Insufficient data"
-    
     # Extract OHLC data
     try:
         if hasattr(candles, 'candles') and candles.candles:
             candle_data = candles.candles
         else:
             candle_data = candles
+            
+        # Check if we have enough data
+        if not candle_data or len(candle_data) < 50:
+            return False, "Insufficient data"
             
         closes = [float(c.close) for c in candle_data]
         highs = [float(c.high) for c in candle_data]
@@ -123,17 +124,17 @@ def enhanced_should_buy(candles, current_price):
     # 1. RSI Filter
     current_rsi = rsi(closes)
     if current_rsi is None or current_rsi >= 30:
-        return False, f"RSI not oversold: {current_rsi:.2f}"
+        return False, f"RSI not oversold: {current_rsi:.2f if current_rsi else 'N/A'}"
     
     # 2. EMA Trend Filter
     ema_50 = ema(closes, 50)
     if ema_50 is None or current_price <= ema_50:
-        return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}"
+        return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f if ema_50 else 'N/A'}"
     
     # 3. MACD Momentum Filter
     macd_line, signal_line, _ = macd(closes)
     if macd_line is None or signal_line is None or macd_line <= signal_line:
-        return False, f"MACD not bullish: {macd_line:.6f} <= {signal_line:.6f}"
+        return False, f"MACD not bullish: {macd_line:.6f if macd_line else 'N/A'} <= {signal_line:.6f if signal_line else 'N/A'}"
     
     # 4. Volatility Filter (ATR)
     current_atr = atr(highs, lows, closes)
@@ -152,15 +153,16 @@ def enhanced_should_sell(candles, current_price, entry_price):
     1. RSI > 70 (overbought) OR
     2. ATR-based stop loss triggered
     """
-    if not candles or len(candles) < 15:
-        return False, "HOLD", "Insufficient data"
-    
     # Extract OHLC data
     try:
         if hasattr(candles, 'candles') and candles.candles:
             candle_data = candles.candles
         else:
             candle_data = candles
+            
+        # Check if we have enough data
+        if not candle_data or len(candle_data) < 15:
+            return False, "HOLD", "Insufficient data"
             
         closes = [float(c.close) for c in candle_data]
         highs = [float(c.high) for c in candle_data]
@@ -184,14 +186,15 @@ def enhanced_should_sell(candles, current_price, entry_price):
 
 def get_atr_stop_loss(candles, entry_price, multiplier=1.5):
     """Calculate ATR-based stop loss price"""
-    if not candles or len(candles) < 15:
-        return None
-    
     try:
         if hasattr(candles, 'candles') and candles.candles:
             candle_data = candles.candles
         else:
             candle_data = candles
+            
+        # Check if we have enough data
+        if not candle_data or len(candle_data) < 15:
+            return None
             
         closes = [float(c.close) for c in candle_data]
         highs = [float(c.high) for c in candle_data]
@@ -208,14 +211,15 @@ def get_atr_stop_loss(candles, entry_price, multiplier=1.5):
 # Legacy functions for backward compatibility
 def should_buy(candles):
     """Legacy function - basic RSI only"""
-    if not candles or len(candles) < 15:
-        return False
-    
     try:
         if hasattr(candles, 'candles') and candles.candles:
             candle_data = candles.candles
         else:
             candle_data = candles
+            
+        # Check if we have enough data
+        if not candle_data or len(candle_data) < 15:
+            return False
             
         closes = [float(c.close) for c in candle_data]
         current_rsi = rsi(closes)
@@ -225,14 +229,15 @@ def should_buy(candles):
 
 def should_sell(candles):
     """Legacy function - basic RSI only"""
-    if not candles or len(candles) < 15:
-        return False
-    
     try:
         if hasattr(candles, 'candles') and candles.candles:
             candle_data = candles.candles
         else:
             candle_data = candles
+            
+        # Check if we have enough data
+        if not candle_data or len(candle_data) < 15:
+            return False
             
         closes = [float(c.close) for c in candle_data]
         current_rsi = rsi(closes)
