@@ -79,7 +79,8 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 
 def rsi(prices, period=14, exclude_current=True):
     """
-    Calculate RSI using Wilder's original method - matches Coinbase UI exactly
+    Calculate RSI using SMA method - matches Coinbase UI exactly
+    Coinbase uses RSI Length: 14, Smoothing Line: SMA, Smoothing Length: 14
     
     Args:
         prices: List of closing prices
@@ -93,36 +94,29 @@ def rsi(prices, period=14, exclude_current=True):
     if len(prices) < period + 1:
         return None
     
-    prices = np.array(prices)
+    # Use only the most recent period+1 prices for calculation
+    prices = prices[-(period + 1):]
+    
+    # Calculate price changes
     deltas = np.diff(prices)
     
-    # Initial seed period
-    seed = deltas[:period]
-    up = seed[seed > 0].sum() / period
-    down = -seed[seed < 0].sum() / period
+    # Separate gains and losses
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
     
-    if down == 0:
+    # Use Simple Moving Average (SMA) - exactly like Coinbase
+    avg_gain = np.mean(gains)
+    avg_loss = np.mean(losses)
+    
+    # Avoid division by zero
+    if avg_loss == 0:
         return 100
-        
-    rs = up / down
-    rsi_values = np.zeros_like(prices)
-    rsi_values[:period] = 100. - 100. / (1. + rs)
-
-    # Wilder's smoothing for remaining periods
-    for i in range(period, len(prices)):
-        delta = deltas[i - 1]
-        upval = max(delta, 0)
-        downval = -min(delta, 0)
-        up = (up * (period - 1) + upval) / period
-        down = (down * (period - 1) + downval) / period
-        
-        if down == 0:
-            rsi_values[i] = 100
-        else:
-            rs = up / down
-            rsi_values[i] = 100. - 100. / (1. + rs)
     
-    return float(rsi_values[-1])
+    # Calculate RSI using standard formula
+    rs = avg_gain / avg_loss
+    rsi_val = 100 - (100 / (1 + rs))
+    
+    return float(rsi_val)
 
 def enhanced_should_buy(candles, current_price):
     """
@@ -155,9 +149,9 @@ def enhanced_should_buy(candles, current_price):
     
     # Debug logging for RSI comparison
     print(f"🔍 RSI Debug - Total candles: {len(closes)}, Last 5 closes: {[f'{c:.6f}' for c in closes[-5:]]}", flush=True)
-    print(f"🔍 RSI without current candle: {current_rsi:.2f}" if current_rsi else "🔍 RSI without current candle: N/A", flush=True)
-    print(f"🔍 RSI with current candle: {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle: N/A", flush=True)
-    print(f"🔍 Compare with Coinbase UI RSI for verification", flush=True)
+    print(f"🔍 RSI without current candle (SMA method): {current_rsi:.2f}" if current_rsi else "🔍 RSI without current candle (SMA method): N/A", flush=True)
+    print(f"🔍 RSI with current candle (SMA method): {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle (SMA method): N/A", flush=True)
+    print(f"🔍 Should match Coinbase UI RSI (Length: 14, Smoothing: SMA)", flush=True)
     
     if current_rsi is None or current_rsi >= 30:
         rsi_display = current_rsi if current_rsi is not None else "N/A"
