@@ -127,8 +127,8 @@ def commit_data_to_github():
                               capture_output=True, text=True)
         
         if result.returncode == 0:
-            # Push to GitHub
-            push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            # Push to GitHub (set upstream on first push)
+            push_result = subprocess.run(['git', 'push', '--set-upstream', 'origin', 'main'], capture_output=True, text=True)
             if push_result.returncode == 0:
                 print(f"✅ Data successfully committed and pushed to GitHub")
                 return True
