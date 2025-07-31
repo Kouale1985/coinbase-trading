@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+import base64
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from coinbase.rest import RESTClient
@@ -16,9 +17,45 @@ API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
 print(f"🔑 COINBASE_API_KEY_ID: {API_KEY}", flush=True)
 print(f"🔐 COINBASE_API_PRIVATE_KEY: {API_SECRET[:8]}...", flush=True)
 
-# === Strip "ed25519:" prefix if needed ===
-if API_SECRET and API_SECRET.startswith("ed25519:"):
-    API_SECRET = API_SECRET[len("ed25519:"):]
+def convert_base64_to_pem(base64_key):
+    """Convert base64-encoded private key to PEM format"""
+    # Remove ed25519: prefix if present
+    if base64_key.startswith("ed25519:"):
+        base64_key = base64_key[len("ed25519:"):]
+    
+    # Add base64 padding if needed
+    missing_padding = len(base64_key) % 4
+    if missing_padding:
+        base64_key += "=" * (4 - missing_padding)
+    
+    try:
+        # Decode base64
+        raw_bytes = base64.b64decode(base64_key)
+        
+        # Ensure we have at least 32 bytes for Ed25519
+        if len(raw_bytes) < 32:
+            raise ValueError(f"Key too short: got {len(raw_bytes)} bytes")
+        
+        # Take first 32 bytes for Ed25519 private key
+        private_key_bytes = raw_bytes[:32]
+        
+        # Convert to PEM format
+        pem_key = f"""-----BEGIN PRIVATE KEY-----
+{base64.b64encode(private_key_bytes).decode('utf-8')}
+-----END PRIVATE KEY-----"""
+        
+        return pem_key
+    except Exception as e:
+        raise ValueError(f"Failed to convert key to PEM format: {e}")
+
+# === Convert API secret to PEM format ===
+if API_SECRET:
+    try:
+        API_SECRET = convert_base64_to_pem(API_SECRET)
+        print("✅ Successfully converted private key to PEM format", flush=True)
+    except Exception as e:
+        print(f"❌ Failed to convert private key: {e}", flush=True)
+        raise
 
 # === Raise error if missing ===
 if not API_KEY or not API_SECRET:
