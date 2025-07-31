@@ -10,13 +10,24 @@ from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced
 from config import CONFIG
 
 # === Professional Portfolio Management Constants ===
-STARTING_BALANCE_USD = 1000
+STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
 MAX_POSITIONS = 4                   # Don't hold more than 4 trades at once
 MAX_EXPOSURE = 0.75                 # Use up to 75% of total balance
 CASH_BUFFER = 0.25                  # Keep at least 25% cash free
 MAX_PER_TRADE = 0.25                # No more than 25% per trade
 MIN_TRADE_SIZE = 50                 # Don't enter trades smaller than this
 RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
+
+# TODO: Add real account balance query
+# def get_real_account_balance():
+#     """Query actual USD balance from Coinbase account"""
+#     try:
+#         accounts = client.get_accounts()
+#         for account in accounts.accounts:
+#             if account.currency == "USD":
+#                 return float(account.available_balance.value)
+#     except Exception:
+#         return STARTING_BALANCE_USD
 
 # === Position Tracking Class with Portfolio Management ===
 class PositionTracker:
@@ -316,8 +327,10 @@ print("   • Reduced noise while capturing intraday moves", flush=True)
 if not SIMULATION:
     print("🚨 WARNING: LIVE TRADING MODE ENABLED! 🚨", flush=True)
     print("💰 Real money will be used for trades!", flush=True)
-    print("📊 Each BUY order will use $10 USD", flush=True)
+    print("📊 Each BUY order will use calculated position size", flush=True)
     print("⚠️ Make sure you have sufficient funds in your account", flush=True)
+    print("🔍 All trades will appear in your Coinbase account", flush=True)
+    print("📱 Check Coinbase Pro → Orders & Portfolio tabs", flush=True)
 else:
     print("✅ Safe mode: Only analyzing signals, no real trades", flush=True)
 
