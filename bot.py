@@ -95,8 +95,11 @@ def commit_data_to_github():
         subprocess.run(['git', 'config', 'user.name', 'Trading Bot'], 
                       capture_output=True, text=True, check=False)
         
-        # Add the data files
-        subprocess.run(['git', 'add', 'data/'], capture_output=True, text=True, check=True)
+        # Add the data files (create directory first if needed)
+        if os.path.exists('data'):
+            subprocess.run(['git', 'add', 'data/'], capture_output=True, text=True, check=True)
+        else:
+            print("📁 Data directory doesn't exist yet, skipping git add")
         
         # Create commit message with timestamp
         now = datetime.now(timezone.utc)
