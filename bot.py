@@ -211,8 +211,44 @@ class PositionTracker:
                 percentage = (position_value / total_balance) * 100
                 print(f"      {pair}: ${pos['entry_price']:.6f} | Value: ${position_value:.2f} ({percentage:.1f}%) | Unrealized: ${unrealized:.2f}", flush=True)
 
-# Initialize position tracker
+# === Signal Throttling Class ===
+class SignalThrottle:
+    def __init__(self, throttle_minutes=15):
+        self.last_signals = {}  # pair -> timestamp
+        self.throttle_seconds = throttle_minutes * 60
+        
+    def can_signal(self, pair):
+        """Check if enough time has passed since last signal for this pair"""
+        now = datetime.now(timezone.utc).timestamp()
+        
+        if pair not in self.last_signals:
+            return True
+            
+        time_since_last = now - self.last_signals[pair]
+        return time_since_last >= self.throttle_seconds
+    
+    def record_signal(self, pair):
+        """Record that a signal was generated for this pair"""
+        self.last_signals[pair] = datetime.now(timezone.utc).timestamp()
+        
+    def get_throttle_status(self, pair):
+        """Get human-readable throttle status"""
+        if pair not in self.last_signals:
+            return "✅ Ready"
+            
+        now = datetime.now(timezone.utc).timestamp()
+        time_since_last = now - self.last_signals[pair]
+        time_remaining = self.throttle_seconds - time_since_last
+        
+        if time_remaining <= 0:
+            return "✅ Ready"
+        else:
+            minutes_remaining = int(time_remaining / 60)
+            return f"⏳ {minutes_remaining}m remaining"
+
+# Initialize position tracker and signal throttle
 position_tracker = PositionTracker()
+signal_throttle = SignalThrottle(throttle_minutes=15)  # 15-minute throttle per pair
 
 # === DEBUG PRINTS: Confirm startup and env ===
 print("✅ bot.py loaded", flush=True)
@@ -309,11 +345,23 @@ except Exception as test_error:
 
 # === Config ===
 GRANULARITY = "FIVE_MINUTE"  # Changed from ONE_MINUTE for better signal quality with multi-filter strategy
-TRADING_PAIRS = os.getenv("TRADE_PAIRS", "XLM-USD,XRP-USD,LINK-USD,OP-USD,ARB-USD").split(",")
+
+# Tier-1 High-Volume Cryptocurrency Pairs (Liquid, Less Manipulation Risk)
+TIER_1_PAIRS = [
+    "BTC-USD", "ETH-USD", "XRP-USD", "ADA-USD", "SOL-USD",
+    "DOGE-USD", "DOT-USD", "AVAX-USD", "MATIC-USD", "LINK-USD",
+    "UNI-USD", "LTC-USD", "ATOM-USD", "XLM-USD", "ALGO-USD",
+    "VET-USD", "ICP-USD", "FIL-USD", "TRX-USD", "ETC-USD",
+    "OP-USD", "ARB-USD"  # Keep your current pairs
+]
+
+# Allow environment override or use tier-1 default
+TRADING_PAIRS = os.getenv("TRADE_PAIRS", ",".join(TIER_1_PAIRS)).split(",")
+
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
 
-print(f"📋 Trading pairs: {TRADING_PAIRS}", flush=True)
+print(f"📋 Trading pairs ({len(TRADING_PAIRS)} total): {TRADING_PAIRS[:5]}..." if len(TRADING_PAIRS) > 5 else f"📋 Trading pairs: {TRADING_PAIRS}", flush=True)
 print(f"⚙️ Loop interval: {LOOP_SECONDS} seconds", flush=True)
 print(f"🧪 Simulation mode: {SIMULATION}", flush=True)
 
@@ -390,13 +438,21 @@ def analyze_and_trade(pair, candles):
             can_buy, buy_reason = enhanced_should_buy(candles, current_price)
             
             if can_buy:
-                # Additional rebuy zone check from config
-                if current_price <= rebuy_zone:
-                    action = "BUY"
-                    reason = f"Enhanced buy signal: {buy_reason}"
-                else:
+                # Check signal throttling before proceeding
+                if not signal_throttle.can_signal(pair):
+                    throttle_status = signal_throttle.get_throttle_status(pair)
                     action = "HOLD"
-                    reason = f"Price above rebuy zone: ${current_price:.6f} > ${rebuy_zone:.6f}"
+                    reason = f"Signal throttled: {throttle_status} (prevents overtrading)"
+                else:
+                    # Additional rebuy zone check from config
+                    if current_price <= rebuy_zone:
+                        action = "BUY"
+                        reason = f"Enhanced buy signal: {buy_reason}"
+                        # Record the signal to start throttle timer
+                        signal_throttle.record_signal(pair)
+                    else:
+                        action = "HOLD"
+                        reason = f"Price above rebuy zone: ${current_price:.6f} > ${rebuy_zone:.6f}"
             else:
                 action = "HOLD" 
                 reason = f"Buy filters failed: {buy_reason}"

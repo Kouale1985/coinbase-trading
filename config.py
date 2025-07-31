@@ -1,9 +1,9 @@
 CONFIG = {
     "DEFAULT": {
-        "take_profit_1": 1.05,  # 5% profit target 1
-        "take_profit_2": 1.15,  # 15% profit target 2
-        "rebuy_zone": 999999,   # Very high value = always allow buys
-        "stop_loss_pct": 0.05   # 5% stop loss
+        "take_profit_1": 1.08,     # 8% profit target 1 (conservative)
+        "take_profit_2": 1.20,     # 20% profit target 2 (aggressive)
+        "rebuy_zone": 999999,      # No price limit - rely on technical filters
+        "stop_loss_pct": 0.05      # 5% stop loss (overridden by ATR stops)
     },
     "XLM-USD": {
         "take_profit_1": 0.46,
@@ -33,6 +33,31 @@ CONFIG = {
         "take_profit_1": 1.20,  # Updated based on typical ARB levels
         "take_profit_2": 1.50,
         "rebuy_zone": 1.50,     # Updated to more realistic level
+        "stop_loss_pct": 0.05
+    },
+    # Major Tier-1 Cryptocurrencies
+    "BTC-USD": {
+        "take_profit_1": 1.08,     # 8% profit (conservative for BTC)
+        "take_profit_2": 1.15,     # 15% profit target
+        "rebuy_zone": 999999,      # No price limit - use technical filters
+        "stop_loss_pct": 0.05
+    },
+    "ETH-USD": {
+        "take_profit_1": 1.10,     # 10% profit target
+        "take_profit_2": 1.20,     # 20% profit target
+        "rebuy_zone": 999999,      # No price limit - use technical filters  
+        "stop_loss_pct": 0.05
+    },
+    "SOL-USD": {
+        "take_profit_1": 1.12,     # 12% profit target
+        "take_profit_2": 1.25,     # 25% profit target
+        "rebuy_zone": 999999,      # No price limit - use technical filters
+        "stop_loss_pct": 0.05
+    },
+    "ADA-USD": {
+        "take_profit_1": 1.15,     # 15% profit target (higher vol altcoin)
+        "take_profit_2": 1.30,     # 30% profit target
+        "rebuy_zone": 999999,      # No price limit - use technical filters
         "stop_loss_pct": 0.05
     }
 }
