@@ -4,3 +4,6 @@ aiohttp
 websockets
 cryptography
 pandas
+numpy
+streamlit
+plotly

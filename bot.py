@@ -3,11 +3,72 @@ import sys
 import asyncio
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from coinbase.rest import RESTClient
+import json
+from io import StringIO
 
-# Import strategy and config modules
-from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss
+from coinbase.rest import RESTClient
+from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
 from config import CONFIG
+
+# === Dashboard Data Export Functions ===
+def ensure_data_directory():
+    """Ensure data directory exists for dashboard exports"""
+    if not os.path.exists('data'):
+        os.makedirs('data')
+
+def export_portfolio_data(position_tracker):
+    """Export portfolio summary for dashboard"""
+    ensure_data_directory()
+    
+    total_balance = position_tracker.calculate_total_balance()
+    portfolio_data = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "starting_balance": position_tracker.starting_balance,
+        "current_cash": position_tracker.cash_balance,
+        "total_balance": total_balance,
+        "position_value": total_balance - position_tracker.cash_balance,
+        "total_return_pct": ((total_balance - position_tracker.starting_balance) / position_tracker.starting_balance) * 100,
+        "realized_pnl": position_tracker.total_pnl,
+        "open_positions": len(position_tracker.positions),
+        "max_positions": MAX_POSITIONS,
+        "total_trades": len(position_tracker.trade_history),
+        "winning_trades": len([t for t in position_tracker.trade_history if t.get("pnl", 0) > 0])
+    }
+    
+    with open('data/portfolio.json', 'w') as f:
+        json.dump(portfolio_data, f, indent=2)
+
+def export_positions_data(position_tracker):
+    """Export current positions for dashboard"""
+    ensure_data_directory()
+    
+    positions_data = []
+    for pair, position in position_tracker.positions.items():
+        positions_data.append({
+            "pair": pair,
+            "entry_price": position["entry_price"],
+            "quantity": position["quantity"],
+            "entry_value": position["entry_value"],
+            "unrealized_pnl": position.get("unrealized_pnl", 0),
+            "entry_time": position["entry_time"]
+        })
+    
+    with open('data/positions.json', 'w') as f:
+        json.dump(positions_data, f, indent=2)
+
+def export_signals_data(signals_data):
+    """Export current market signals for dashboard"""
+    ensure_data_directory()
+    
+    with open('data/signals.json', 'w') as f:
+        json.dump(signals_data, f, indent=2)
+
+def export_trade_history(position_tracker):
+    """Export trade history for dashboard"""
+    ensure_data_directory()
+    
+    with open('data/trade_history.json', 'w') as f:
+        json.dump(position_tracker.trade_history, f, indent=2)
 
 # === Professional Portfolio Management Constants ===
 STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
@@ -581,13 +642,62 @@ def analyze_and_trade(pair, candles):
 # === Bot execution ===
 async def run_bot():
     """Run the bot for all trading pairs"""
+    signals_data = []
+    
     for pair in TRADING_PAIRS:
         try:
             print(f"\n🔄 Processing {pair}...", flush=True)
             candles = fetch_candles(pair)
+            
+            # Collect signal data for dashboard
+            if candles and hasattr(candles, 'candles') and candles.candles:
+                candle_data = candles.candles
+                current_price = float(candle_data[-1].close)
+                
+                # Get technical indicators
+                closes = [float(c.close) for c in candle_data]
+                highs = [float(c.high) for c in candle_data]
+                lows = [float(c.low) for c in candle_data]
+                
+                current_rsi = rsi(closes, exclude_current=True)
+                ema_50 = ema(closes, 50)
+                macd_line, signal_line, _ = macd(closes)
+                current_atr = atr(highs, lows, closes)
+                
+                # Get buy/sell analysis
+                can_buy, buy_reason = enhanced_should_buy(candles, current_price)
+                throttle_status = signal_throttle.get_throttle_status(pair)
+                
+                signal_data = {
+                    "pair": pair,
+                    "price": current_price,
+                    "rsi": current_rsi,
+                    "ema_50": ema_50,
+                    "ema_uptrend": ema_50 and current_price > ema_50,
+                    "macd_line": macd_line,
+                    "signal_line": signal_line,
+                    "macd_bullish": macd_line and signal_line and macd_line > signal_line,
+                    "atr": current_atr,
+                    "volatility_ratio": current_atr / current_price if current_atr else None,
+                    "can_buy": can_buy,
+                    "buy_reason": buy_reason,
+                    "throttle_status": throttle_status,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                signals_data.append(signal_data)
+            
             analyze_and_trade(pair, candles) # Remove await
         except Exception as e:
             print(f"⚠️ Error processing {pair}: {e}", flush=True)
+    
+    # Export all data for dashboard
+    try:
+        export_portfolio_data(position_tracker)
+        export_positions_data(position_tracker)
+        export_signals_data(signals_data)
+        export_trade_history(position_tracker)
+    except Exception as e:
+        print(f"⚠️ Error exporting dashboard data: {e}", flush=True)
     
     # Print trading summary after analyzing all pairs
     position_tracker.print_summary()
