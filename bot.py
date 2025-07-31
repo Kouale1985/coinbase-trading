@@ -28,7 +28,7 @@ def export_portfolio_data(position_tracker):
         "position_value": sum(pos.position_value for pos in position_tracker.positions.values()),
         "total_balance": position_tracker.calculate_total_balance(),
         "total_return_pct": ((position_tracker.calculate_total_balance() - STARTING_BALANCE_USD) / STARTING_BALANCE_USD) * 100,
-        "realized_pnl": position_tracker.realized_pnl,
+        "realized_pnl": position_tracker.total_pnl,
         "open_positions": len(position_tracker.positions),
         "max_positions": MAX_POSITIONS,
         "total_trades": len(position_tracker.trade_history),
@@ -717,6 +717,7 @@ async def run_bot():
             if candles and hasattr(candles, 'candles') and candles.candles:
                 candle_data = candles.candles
                 current_price = float(candle_data[-1].close)
+                config = CONFIG.get(pair, CONFIG["DEFAULT"])
                 
                 # Get technical indicators
                 closes = [float(c.close) for c in candle_data]
