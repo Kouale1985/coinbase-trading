@@ -351,7 +351,7 @@ TIER_1_PAIRS = [
     "BTC-USD", "ETH-USD", "XRP-USD", "ADA-USD", "SOL-USD",
     "DOGE-USD", "DOT-USD", "AVAX-USD", "MATIC-USD", "LINK-USD",
     "UNI-USD", "LTC-USD", "ATOM-USD", "XLM-USD", "ALGO-USD",
-    "VET-USD", "ICP-USD", "FIL-USD", "TRX-USD", "ETC-USD",
+    "VET-USD", "ICP-USD", "FIL-USD", "ETC-USD",  # Removed TRX-USD
     "OP-USD", "ARB-USD"  # Keep your current pairs
 ]
 
