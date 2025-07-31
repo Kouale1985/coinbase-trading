@@ -339,8 +339,9 @@ def fetch_candles(pair):
     """Fetch candle data for the specified pair"""
     try:
         now = datetime.now(timezone.utc)
-        # Fetch 5 hours of 5-minute candles (60 candles) for better indicator accuracy
-        start = now - timedelta(hours=5)
+        # Fetch 200+ candles for proper RSI initialization (1000 minutes = ~16.7 hours for 5-min candles)
+        # This ensures proper Wilder's RSI smoothing that matches Coinbase UI
+        start = now - timedelta(minutes=1000)
         
         # Convert to Unix timestamps (seconds since epoch)
         start_unix = int(start.timestamp())
@@ -348,6 +349,7 @@ def fetch_candles(pair):
         
         print(f"🕐 Fetching {GRANULARITY} candles for {pair} from {start.isoformat()} to {now.isoformat()}", flush=True)
         print(f"   📊 Unix timestamps: start={start_unix}, end={end_unix}, granularity={GRANULARITY}", flush=True)
+        print(f"   📈 Data window: ~200 candles for proper RSI initialization", flush=True)
         
         candles = client.get_candles(  # Remove await
             product_id=pair,

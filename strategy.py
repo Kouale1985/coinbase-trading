@@ -154,7 +154,7 @@ def enhanced_should_buy(candles, current_price):
     current_rsi_with_live = rsi(closes, exclude_current=False)  # Include current candle
     
     # Debug logging for RSI comparison
-    print(f"🔍 RSI Debug - Last 5 closes: {[f'{c:.6f}' for c in closes[-5:]]}", flush=True)
+    print(f"🔍 RSI Debug - Total candles: {len(closes)}, Last 5 closes: {[f'{c:.6f}' for c in closes[-5:]]}", flush=True)
     print(f"🔍 RSI without current candle: {current_rsi:.2f}" if current_rsi else "🔍 RSI without current candle: N/A", flush=True)
     print(f"🔍 RSI with current candle: {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle: N/A", flush=True)
     print(f"🔍 Compare with Coinbase UI RSI for verification", flush=True)
