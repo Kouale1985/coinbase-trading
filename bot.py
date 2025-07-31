@@ -24,7 +24,7 @@ def export_portfolio_data(position_tracker):
     """Export portfolio summary data with encoding"""
     portfolio_data = {
         "starting_balance": STARTING_BALANCE_USD,
-        "current_cash": position_tracker.current_cash,
+        "current_cash": position_tracker.cash_balance,
         "position_value": sum(pos.position_value for pos in position_tracker.positions.values()),
         "total_balance": position_tracker.calculate_total_balance(),
         "total_return_pct": ((position_tracker.calculate_total_balance() - STARTING_BALANCE_USD) / STARTING_BALANCE_USD) * 100,
@@ -560,7 +560,7 @@ def analyze_and_trade(pair, candles):
         
         if current_position is None:
             # No position - use enhanced buy logic
-            can_buy, buy_reason = enhanced_should_buy(candles, current_price)
+            can_buy, buy_reason = enhanced_should_buy(candles, pair, config, current_price)
             
             if can_buy:
                 # Check signal throttling before proceeding
@@ -729,7 +729,7 @@ async def run_bot():
                 current_atr = atr(highs, lows, closes)
                 
                 # Get buy/sell analysis
-                can_buy, buy_reason = enhanced_should_buy(candles, current_price)
+                can_buy, buy_reason = enhanced_should_buy(candles, pair, config, current_price)
                 throttle_status = signal_throttle.get_throttle_status(pair)
                 
                 signal_data = {
