@@ -153,29 +153,48 @@ def enhanced_should_buy(candles, current_price):
     print(f"🔍 RSI with current candle (SMA method): {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle (SMA method): N/A", flush=True)
     print(f"🔍 Should match Coinbase UI RSI (Length: 14, Smoothing: SMA)", flush=True)
     
+    # 2. EMA Trend Filter (with debug info)
+    ema_50 = ema(closes, 50)
+    print(f"📈 EMA-50: {ema_50:.6f} | Price: {current_price:.6f} | Uptrend: {'✅' if ema_50 and current_price > ema_50 else '❌'}" if ema_50 else "📈 EMA-50: N/A | Price: {current_price:.6f} | Uptrend: ❌", flush=True)
+    
+    # 3. MACD Momentum Filter (with debug info)
+    macd_line, signal_line, histogram = macd(closes)
+    if macd_line is not None and signal_line is not None:
+        crossover_status = "Bullish ✅" if macd_line > signal_line else "Bearish ❌"
+        print(f"🔁 MACD: {macd_line:.6f} | Signal: {signal_line:.6f} | Crossover: {crossover_status}", flush=True)
+    else:
+        print(f"🔁 MACD: N/A | Signal: N/A | Crossover: ❌", flush=True)
+    
+    # 4. ATR Volatility Filter (with debug info)
+    current_atr = atr(highs, lows, closes)
+    volatility_ratio = current_atr / current_price if current_atr else None
+    if current_atr:
+        suggested_stop_loss = current_price - (1.5 * current_atr)
+        volatility_ok = volatility_ratio <= 0.03
+        print(f"⚠️ ATR(14): {current_atr:.6f} | Volatility: {volatility_ratio:.4f} ({volatility_ratio*100:.2f}%) | {'✅' if volatility_ok else '❌'}", flush=True)
+        print(f"🛡️ Suggested Stop-Loss: {suggested_stop_loss:.6f} (1.5x ATR below current price)", flush=True)
+    else:
+        print(f"⚠️ ATR(14): N/A | Volatility: N/A | ❌", flush=True)
+    
+    print(f"", flush=True)  # Empty line for readability
+    
+    # Now apply the filters with existing logic
     if current_rsi is None or current_rsi >= 30:
         rsi_display = current_rsi if current_rsi is not None else "N/A"
         return False, f"RSI not oversold: {rsi_display:.2f}" if current_rsi is not None else f"RSI not oversold: {rsi_display}"
     
-    # 2. EMA Trend Filter
-    ema_50 = ema(closes, 50)
     if ema_50 is None or current_price <= ema_50:
         ema_display = ema_50 if ema_50 is not None else "N/A"
         return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}" if ema_50 is not None else f"Price below 50 EMA: ${current_price:.6f} <= {ema_display}"
     
-    # 3. MACD Momentum Filter
-    macd_line, signal_line, _ = macd(closes)
     if macd_line is None or signal_line is None or macd_line <= signal_line:
         macd_display = f"{macd_line:.6f}" if macd_line is not None else "N/A"
         signal_display = f"{signal_line:.6f}" if signal_line is not None else "N/A"
         return False, f"MACD not bullish: {macd_display} <= {signal_display}"
     
-    # 4. Volatility Filter (ATR)
-    current_atr = atr(highs, lows, closes)
     if current_atr is None:
         return False, "ATR calculation failed"
         
-    volatility_ratio = current_atr / current_price
     if volatility_ratio > 0.03:  # 3% threshold
         return False, f"Too volatile: ATR ratio {volatility_ratio:.4f} > 0.03"
     
@@ -204,13 +223,25 @@ def enhanced_should_sell(candles, current_price, entry_price):
     except Exception as e:
         return False, "HOLD", f"Data parsing error: {e}"
     
-    # RSI Overbought Check
+    # RSI Overbought Check (with debug info)
     current_rsi = rsi(closes, exclude_current=True)  # Use same method as buy logic
+    print(f"🔍 SELL Check - RSI: {current_rsi:.2f} | Overbought Threshold: 70 | {'✅ SELL' if current_rsi and current_rsi > 70 else '❌ HOLD'}" if current_rsi else "🔍 SELL Check - RSI: N/A | ❌ HOLD", flush=True)
+    
+    # ATR-based Stop Loss Check (with debug info)
+    current_atr = atr(highs, lows, closes)
+    if current_atr is not None and entry_price is not None:
+        atr_stop_loss = entry_price - (1.5 * current_atr)
+        stop_triggered = current_price <= atr_stop_loss
+        print(f"🛡️ ATR Stop-Loss: {atr_stop_loss:.6f} | Current: {current_price:.6f} | Entry: {entry_price:.6f} | {'🚨 TRIGGERED' if stop_triggered else '✅ SAFE'}", flush=True)
+    else:
+        print(f"🛡️ ATR Stop-Loss: N/A | Current: {current_price:.6f} | Entry: {entry_price:.6f if entry_price else 'N/A'}", flush=True)
+    
+    print(f"", flush=True)  # Empty line for readability
+    
+    # Apply sell logic
     if current_rsi is not None and current_rsi > 70:
         return True, "SELL (RSI)", f"RSI overbought: {current_rsi:.2f}"
     
-    # ATR-based Stop Loss
-    current_atr = atr(highs, lows, closes)
     if current_atr is not None and entry_price is not None:
         atr_stop_loss = entry_price - (1.5 * current_atr)
         if current_price <= atr_stop_loss:
