@@ -123,23 +123,34 @@ def enhanced_should_buy(candles, pair, config, current_price):
     Enhanced buy signal with multiple filters
     """
     try:
-        if len(candles.candles) < 50:
-            print(f"⚠️ Insufficient data for {pair}: {len(candles.candles)} candles")
+        # Extract candle data
+        if hasattr(candles, 'candles') and candles.candles:
+            candle_data = candles.candles
+        else:
+            candle_data = candles
+            
+        if len(candle_data) < 50:
+            print(f"⚠️ Insufficient data for {pair}: {len(candle_data)} candles")
             return False, "Insufficient data"
         
+        # Extract price arrays
+        closes = [float(c.close) for c in candle_data]
+        highs = [float(c.high) for c in candle_data]
+        lows = [float(c.low) for c in candle_data]
+        
         # Calculate indicators
-        current_rsi = rsi(candles, exclude_current=True)
-        ema_50 = ema(candles, 50)
-        macd_line, signal_line = macd(candles)
-        current_atr = atr(candles)
+        current_rsi = rsi(closes, exclude_current=True)
+        ema_50 = ema(closes, 50)
+        macd_line, signal_line, _ = macd(closes)
+        current_atr = atr(highs, lows, closes)
         
         if not all([current_rsi, ema_50, macd_line, signal_line, current_atr]):
             return False, "Indicator calculation failed"
         
         # Debug logging
-        print(f"🔍 RSI Debug - Total candles: {len(candles.candles)}, Last 5 closes: {[c.close for c in candles.candles[-5:]]}")
+        print(f"🔍 RSI Debug - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
         print(f"🔍 RSI without current candle (SMA method): {current_rsi:.2f}")
-        print(f"🔍 RSI with current candle (SMA method): {rsi(candles, exclude_current=False):.2f}")
+        print(f"🔍 RSI with current candle (SMA method): {rsi(closes, exclude_current=False):.2f}")
         print(f"🔍 Should match Coinbase UI RSI (Length: 14, Smoothing: SMA)")
         
         # EMA trend check

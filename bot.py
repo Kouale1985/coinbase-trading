@@ -34,7 +34,7 @@ def export_portfolio_data(position_tracker):
         "total_trades": len(position_tracker.trade_history),
         "winning_trades": len([t for t in position_tracker.trade_history if t.get('pnl', 0) > 0]),
         "portfolio_exposure": (sum(pos.position_value for pos in position_tracker.positions.values()) / position_tracker.calculate_total_balance()) * 100,
-        "max_exposure": MAX_PORTFOLIO_EXPOSURE * 100,
+        "max_exposure": MAX_EXPOSURE * 100,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
