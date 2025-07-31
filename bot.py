@@ -110,11 +110,8 @@ def commit_data_to_github():
             # Ensure we're on main branch and sync with remote
             subprocess.run(['git', 'checkout', '-B', 'main'], 
                           capture_output=True, text=True, check=False)
-            # Fetch remote changes and resolve conflicts
-            subprocess.run(['git', 'fetch', 'origin', 'main'], 
-                          capture_output=True, text=True, check=False)
-            # Force push instead of merge to avoid conflicts with data files
-            print("📤 Syncing with remote repository...")
+            # Skip fetch to avoid conflicts - force push will override remote
+            print("📤 Configured for force push to override remote conflicts")
             print(f"🔧 Git remote configured with GitHub token")
         
         # Add the data files (create directory first if needed)
