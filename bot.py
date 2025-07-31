@@ -95,6 +95,14 @@ def commit_data_to_github():
         subprocess.run(['git', 'config', 'user.name', 'Trading Bot'], 
                       capture_output=True, text=True, check=False)
         
+        # Configure git remote with token for pushing
+        github_token = os.getenv('GITHUB_TOKEN')
+        if github_token:
+            # Set up remote origin with authentication
+            remote_url = f"https://{github_token}@github.com/Kouale1985/dashboard.git"
+            subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], 
+                          capture_output=True, text=True, check=False)
+        
         # Add the data files (create directory first if needed)
         if os.path.exists('data'):
             subprocess.run(['git', 'add', 'data/'], capture_output=True, text=True, check=True)
