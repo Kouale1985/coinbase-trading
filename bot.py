@@ -224,8 +224,8 @@ def fetch_candles(pair):
     """Fetch candle data for the specified pair"""
     try:
         now = datetime.now(timezone.utc)
-        # Fetch 4 hours of 5-minute candles (48 candles) for better indicator accuracy
-        start = now - timedelta(hours=4)
+        # Fetch 5 hours of 5-minute candles (60 candles) for better indicator accuracy
+        start = now - timedelta(hours=5)
         
         # Convert to Unix timestamps (seconds since epoch)
         start_unix = int(start.timestamp())
