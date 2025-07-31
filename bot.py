@@ -100,8 +100,13 @@ def commit_data_to_github():
         if github_token:
             # Set up remote origin with authentication
             remote_url = f"https://{github_token}@github.com/Kouale1985/dashboard.git"
-            subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], 
+            
+            # Remove existing origin if it exists, then add new one
+            subprocess.run(['git', 'remote', 'remove', 'origin'], 
                           capture_output=True, text=True, check=False)
+            subprocess.run(['git', 'remote', 'add', 'origin', remote_url], 
+                          capture_output=True, text=True, check=False)
+            print(f"🔧 Git remote configured with GitHub token")
         
         # Add the data files (create directory first if needed)
         if os.path.exists('data'):
