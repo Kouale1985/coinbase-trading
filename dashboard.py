@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import requests
 from datetime import datetime, timezone
 import plotly.express as px
 import plotly.graph_objects as go
@@ -41,6 +42,40 @@ def load_json_data(filename):
         st.error(f"Error loading {filename}: {e}")
     return None
 
+def load_json_from_github(repo_owner, repo_name, file_path, branch="main"):
+    """Load JSON data from GitHub raw URL"""
+    try:
+        # GitHub raw URL format
+        url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/{branch}/{file_path}"
+        
+        # Add cache busting parameter to ensure fresh data
+        import time
+        cache_bust = int(time.time())
+        url += f"?cb={cache_bust}"
+        
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 404:
+            return None  # File doesn't exist yet
+        else:
+            st.error(f"GitHub API error {response.status_code} for {file_path}")
+            return None
+            
+    except requests.exceptions.Timeout:
+        st.error(f"Timeout loading {file_path} from GitHub")
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Network error loading {file_path}: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        st.error(f"Invalid JSON in {file_path}: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Error loading {file_path} from GitHub: {e}")
+        return None
+
 def format_currency(value):
     """Format currency values"""
     if value is None:
@@ -67,21 +102,81 @@ def get_signal_color(can_buy, rsi, throttle_status):
 # Main dashboard
 def main():
     st.title("🚀 Coinbase Trading Bot Dashboard")
+    
+    # Sidebar configuration
+    st.sidebar.header("⚙️ Configuration")
+    
+    # GitHub repository settings
+    st.sidebar.subheader("📂 GitHub Repository")
+    
+    # Get GitHub repo info from user
+    repo_owner = st.sidebar.text_input("GitHub Username/Organization", 
+                                      value="", 
+                                      help="Your GitHub username or organization name")
+    repo_name = st.sidebar.text_input("Repository Name", 
+                                     value="", 
+                                     help="The name of your repository (e.g., 'trading-bot')")
+    
+    # Auto-refresh setting
+    auto_refresh = st.sidebar.checkbox("🔄 Auto-refresh (30s)", value=True)
+    
+    # Manual refresh button
+    if st.sidebar.button("🔃 Refresh Now"):
+        st.rerun()
+    
     st.markdown("---")
+    
+    # Check if GitHub settings are provided
+    if not repo_owner or not repo_name:
+        st.warning("⚙️ Please configure your GitHub repository in the sidebar to load live data.")
+        st.info("""
+        **📋 Setup Instructions:**
+        
+        1. **Enter your GitHub username** and **repository name** in the sidebar
+        2. Make sure your trading bot is **pushing data to GitHub**
+        3. The dashboard will automatically load the latest data
+        
+        **Example:**
+        - GitHub Username: `john-doe`
+        - Repository Name: `coinbase-trading-bot`
+        """)
+        return
     
     # Auto-refresh mechanism
     placeholder = st.empty()
     
     with placeholder.container():
-        # Load data
-        portfolio_data = load_json_data('data/portfolio.json')
-        positions_data = load_json_data('data/positions.json')
-        signals_data = load_json_data('data/signals.json')
-        trade_history = load_json_data('data/trade_history.json')
+        # Load data from GitHub
+        with st.spinner("📡 Loading data from GitHub..."):
+            portfolio_data = load_json_from_github(repo_owner, repo_name, "data/portfolio.json")
+            positions_data = load_json_from_github(repo_owner, repo_name, "data/positions.json")
+            signals_data = load_json_from_github(repo_owner, repo_name, "data/signals.json")
+            trade_history = load_json_from_github(repo_owner, repo_name, "data/trade_history.json")
         
         if not portfolio_data:
-            st.warning("⚠️ No portfolio data available. Make sure your bot is running and exporting data.")
-            st.stop()
+            st.warning("⚠️ No portfolio data found on GitHub.")
+            st.info(f"""
+            **🔍 Troubleshooting:**
+            
+            1. **Check repository:** Is `{repo_owner}/{repo_name}` correct?
+            2. **Check bot status:** Is your Render bot running and pushing data?
+            3. **Check GitHub:** Look for `data/portfolio.json` in your repository
+            4. **Wait a moment:** Your bot updates every 2 minutes
+            
+            **Expected GitHub structure:**
+            ```
+            {repo_name}/
+            ├── data/
+            │   ├── portfolio.json
+            │   ├── positions.json
+            │   ├── signals.json
+            │   └── trade_history.json
+            ```
+            """)
+            return
+        
+        # Success indicator
+        st.success(f"✅ Successfully loaded data from `{repo_owner}/{repo_name}`")
         
         # Header metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -219,9 +314,10 @@ def main():
                 display_trades.columns = ['Result', 'Pair', 'Entry $', 'Exit $', 'P&L $', 'P&L %']
                 st.dataframe(display_trades, use_container_width=True, hide_index=True)
     
-    # Auto-refresh every 30 seconds
-    time.sleep(30)
-    st.rerun()
+    # Auto-refresh every 30 seconds if enabled
+    if auto_refresh:
+        time.sleep(30)
+        st.rerun()
 
 if __name__ == "__main__":
     main()

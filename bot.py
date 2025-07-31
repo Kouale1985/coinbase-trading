@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import json
 from io import StringIO
 
+import subprocess
+import tempfile
+
 from coinbase.rest import RESTClient
 from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
 from config import CONFIG
@@ -69,6 +72,54 @@ def export_trade_history(position_tracker):
     
     with open('data/trade_history.json', 'w') as f:
         json.dump(position_tracker.trade_history, f, indent=2)
+
+def commit_data_to_github():
+    """
+    Commit the exported data files to GitHub
+    This allows Streamlit to read the data from GitHub raw URLs
+    """
+    try:
+        # Configure git if not already done
+        subprocess.run(['git', 'config', 'user.email', 'bot@tradingbot.com'], 
+                      capture_output=True, text=True, check=False)
+        subprocess.run(['git', 'config', 'user.name', 'Trading Bot'], 
+                      capture_output=True, text=True, check=False)
+        
+        # Add the data files
+        subprocess.run(['git', 'add', 'data/'], capture_output=True, text=True, check=True)
+        
+        # Create commit message with timestamp
+        now = datetime.now(timezone.utc)
+        commit_msg = f"🤖 Bot data update: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        
+        # Commit the changes
+        result = subprocess.run(['git', 'commit', '-m', commit_msg], 
+                              capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            # Push to GitHub
+            push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            if push_result.returncode == 0:
+                print(f"✅ Data successfully committed and pushed to GitHub")
+                return True
+            else:
+                print(f"⚠️ Git push failed: {push_result.stderr}")
+                return False
+        else:
+            # No changes to commit (data unchanged)
+            if "nothing to commit" in result.stdout:
+                print("📊 No data changes since last commit")
+                return True
+            else:
+                print(f"⚠️ Git commit failed: {result.stderr}")
+                return False
+                
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Git operation failed: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error in GitHub sync: {e}")
+        return False
 
 # === Professional Portfolio Management Constants ===
 STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
@@ -696,6 +747,7 @@ async def run_bot():
         export_positions_data(position_tracker)
         export_signals_data(signals_data)
         export_trade_history(position_tracker)
+        commit_data_to_github()
     except Exception as e:
         print(f"⚠️ Error exporting dashboard data: {e}", flush=True)
     
