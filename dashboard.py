@@ -246,12 +246,14 @@ def main():
             # Create a clean display table
             display_data = []
             for _, row in df_signals.iterrows():
+                # Convert can_buy to action for display
+                action = "BUY" if row.get('can_buy', False) else "HOLD"
                 display_data.append({
-                    "🚦": get_signal_color(row['action'], row['rsi']),
+                    "🚦": get_signal_color(action, row['rsi']),
                     "Trading Pair": row['pair'],
                     "Price": f"${row['price']:,.4f}",
                     "RSI": f"{row['rsi']:.1f}",
-                    "Signal": row['action'],
+                    "Signal": action,
                     "EMA Trend": "📈" if row.get('ema_uptrend', False) else "📉",
                     "MACD": "🚀" if row.get('macd_bullish', False) else "🔻"
                 })
