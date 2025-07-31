@@ -118,87 +118,101 @@ def rsi(prices, period=14, exclude_current=True):
     
     return float(rsi_val)
 
-def enhanced_should_buy(candles, current_price):
+def enhanced_should_buy(candles, pair, config, current_price):
     """
-    Enhanced buy logic with multiple filters:
-    1. RSI < 30 (oversold)
-    2. Price > 50 EMA (uptrend)
-    3. MACD line > signal line (momentum)
-    4. ATR < 3% of price (not too volatile)
+    Enhanced buy signal with multiple filters
     """
-    # Extract OHLC data
     try:
-        if hasattr(candles, 'candles') and candles.candles:
-            candle_data = candles.candles
-        else:
-            candle_data = candles
-            
-        # Check if we have enough data
-        if not candle_data or len(candle_data) < 50:
+        if len(candles.candles) < 50:
+            print(f"⚠️ Insufficient data for {pair}: {len(candles.candles)} candles")
             return False, "Insufficient data"
-            
-        closes = [float(c.close) for c in candle_data]
-        highs = [float(c.high) for c in candle_data]
-        lows = [float(c.low) for c in candle_data]
-    except Exception as e:
-        return False, f"Data parsing error: {e}"
-    
-    # 1. RSI Filter (with debug info)
-    current_rsi = rsi(closes, exclude_current=True)  # Exclude current candle like Coinbase
-    current_rsi_with_live = rsi(closes, exclude_current=False)  # Include current candle
-    
-    # Debug logging for RSI comparison
-    print(f"🔍 RSI Debug - Total candles: {len(closes)}, Last 5 closes: {[f'{c:.6f}' for c in closes[-5:]]}", flush=True)
-    print(f"🔍 RSI without current candle (SMA method): {current_rsi:.2f}" if current_rsi else "🔍 RSI without current candle (SMA method): N/A", flush=True)
-    print(f"🔍 RSI with current candle (SMA method): {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle (SMA method): N/A", flush=True)
-    print(f"🔍 Should match Coinbase UI RSI (Length: 14, Smoothing: SMA)", flush=True)
-    
-    # 2. EMA Trend Filter (with debug info)
-    ema_50 = ema(closes, 50)
-    print(f"📈 EMA-50: {ema_50:.6f} | Price: {current_price:.6f} | Uptrend: {'✅' if ema_50 and current_price > ema_50 else '❌'}" if ema_50 else "📈 EMA-50: N/A | Price: {current_price:.6f} | Uptrend: ❌", flush=True)
-    
-    # 3. MACD Momentum Filter (with debug info)
-    macd_line, signal_line, histogram = macd(closes)
-    if macd_line is not None and signal_line is not None:
-        crossover_status = "Bullish ✅" if macd_line > signal_line else "Bearish ❌"
-        print(f"🔁 MACD: {macd_line:.6f} | Signal: {signal_line:.6f} | Crossover: {crossover_status}", flush=True)
-    else:
-        print(f"🔁 MACD: N/A | Signal: N/A | Crossover: ❌", flush=True)
-    
-    # 4. ATR Volatility Filter (with debug info)
-    current_atr = atr(highs, lows, closes)
-    volatility_ratio = current_atr / current_price if current_atr else None
-    if current_atr:
-        suggested_stop_loss = current_price - (1.5 * current_atr)
-        volatility_ok = volatility_ratio <= 0.03
-        print(f"⚠️ ATR(14): {current_atr:.6f} | Volatility: {volatility_ratio:.4f} ({volatility_ratio*100:.2f}%) | {'✅' if volatility_ok else '❌'}", flush=True)
-        print(f"🛡️ Suggested Stop-Loss: {suggested_stop_loss:.6f} (1.5x ATR below current price)", flush=True)
-    else:
-        print(f"⚠️ ATR(14): N/A | Volatility: N/A | ❌", flush=True)
-    
-    print(f"", flush=True)  # Empty line for readability
-    
-    # Now apply the filters with existing logic
-    if current_rsi is None or current_rsi >= 30:
-        rsi_display = current_rsi if current_rsi is not None else "N/A"
-        return False, f"RSI not oversold: {rsi_display:.2f}" if current_rsi is not None else f"RSI not oversold: {rsi_display}"
-    
-    if ema_50 is None or current_price <= ema_50:
-        ema_display = ema_50 if ema_50 is not None else "N/A"
-        return False, f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}" if ema_50 is not None else f"Price below 50 EMA: ${current_price:.6f} <= {ema_display}"
-    
-    if macd_line is None or signal_line is None or macd_line <= signal_line:
-        macd_display = f"{macd_line:.6f}" if macd_line is not None else "N/A"
-        signal_display = f"{signal_line:.6f}" if signal_line is not None else "N/A"
-        return False, f"MACD not bullish: {macd_display} <= {signal_display}"
-    
-    if current_atr is None:
-        return False, "ATR calculation failed"
         
-    if volatility_ratio > 0.03:  # 3% threshold
-        return False, f"Too volatile: ATR ratio {volatility_ratio:.4f} > 0.03"
-    
-    return True, f"All filters passed - RSI: {current_rsi:.2f}, EMA: ${ema_50:.6f}, MACD: {macd_line:.6f}, ATR: {volatility_ratio:.4f}"
+        # Calculate indicators
+        current_rsi = rsi(candles, exclude_current=True)
+        ema_50 = ema(candles, 50)
+        macd_line, signal_line = macd(candles)
+        current_atr = atr(candles)
+        
+        if not all([current_rsi, ema_50, macd_line, signal_line, current_atr]):
+            return False, "Indicator calculation failed"
+        
+        # Debug logging
+        print(f"🔍 RSI Debug - Total candles: {len(candles.candles)}, Last 5 closes: {[c.close for c in candles.candles[-5:]]}")
+        print(f"🔍 RSI without current candle (SMA method): {current_rsi:.2f}")
+        print(f"🔍 RSI with current candle (SMA method): {rsi(candles, exclude_current=False):.2f}")
+        print(f"🔍 Should match Coinbase UI RSI (Length: 14, Smoothing: SMA)")
+        
+        # EMA trend check
+        ema_uptrend = current_price > ema_50
+        print(f"📈 EMA-50: {ema_50:.6f} | Price: {current_price:.6f} | Uptrend: {'✅' if ema_uptrend else '❌'}")
+        
+        # MACD momentum check
+        macd_bullish = macd_line > signal_line
+        print(f"🔁 MACD: {macd_line:.6f} | Signal: {signal_line:.6f} | Crossover: {'Bullish ✅' if macd_bullish else 'Bearish ❌'}")
+        
+        # ATR volatility check (should be reasonable, not too high)
+        volatility_ratio = current_atr / current_price
+        volatility_ok = volatility_ratio < 0.03  # Less than 3% volatility
+        print(f"⚠️ ATR(14): {current_atr:.6f} | Volatility: {volatility_ratio:.4f} ({volatility_ratio*100:.2f}%) | {'✅' if volatility_ok else '❌'}")
+        print(f"🛡️ Suggested Stop-Loss: {current_price - (1.5 * current_atr):.6f} (1.5x ATR below current price)")
+        
+        # Get configuration for this pair
+        pair_config = config.get(pair, config.get("DEFAULT", {}))
+        rebuy_zone = pair_config.get("rebuy_zone", current_price * 1.05)  # 5% above current as default
+        
+        print()
+        
+        # Enhanced buy conditions with SMART ADJUSTMENTS
+        # 🎯 SMART TWEAK #1: Slightly more aggressive RSI (30 -> 32)
+        rsi_oversold = current_rsi < 32  # Was 30, now 32 for more opportunities
+        
+        # 🎯 SMART TWEAK #2: Allow super oversold entries even with bearish MACD
+        super_oversold = current_rsi < 25  # Emergency oversold condition
+        
+        # Main buy conditions
+        basic_conditions = (
+            rsi_oversold and 
+            ema_uptrend and 
+            volatility_ok and 
+            current_price <= rebuy_zone
+        )
+        
+        # Enhanced condition: allow super oversold entries even with bearish MACD
+        emergency_oversold = (
+            super_oversold and 
+            ema_uptrend and 
+            volatility_ok and 
+            current_price <= rebuy_zone
+        )
+        
+        # Final buy decision
+        should_buy = (basic_conditions and macd_bullish) or emergency_oversold
+        
+        # Detailed reason logging
+        if not should_buy:
+            if not rsi_oversold:
+                reason = f"RSI not oversold: {current_rsi:.2f}"
+            elif not ema_uptrend:
+                reason = f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}"
+            elif not macd_bullish and not super_oversold:
+                reason = f"MACD bearish and RSI not super oversold: {current_rsi:.2f}"
+            elif not volatility_ok:
+                reason = f"Volatility too high: {volatility_ratio*100:.2f}%"
+            elif current_price > rebuy_zone:
+                reason = f"Price above rebuy zone: ${current_price:.6f} > ${rebuy_zone:.6f}"
+            else:
+                reason = "Multiple filter failures"
+        else:
+            if emergency_oversold:
+                reason = f"Emergency oversold entry: RSI {current_rsi:.2f} < 25"
+            else:
+                reason = f"All enhanced filters passed: RSI {current_rsi:.2f}, EMA trend ✅, MACD ✅"
+        
+        return should_buy, reason
+        
+    except Exception as e:
+        print(f"❌ Error in enhanced_should_buy for {pair}: {e}")
+        return False, f"Error: {str(e)}"
 
 def enhanced_should_sell(candles, current_price, entry_price):
     """
