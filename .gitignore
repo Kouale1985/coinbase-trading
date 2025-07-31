@@ -1,5 +1,5 @@
-# Data directory (contains real-time trading data)
-data/
+# Data directory removed from .gitignore to enable dashboard sync
+# data/
 
 # Environment variables
 .env

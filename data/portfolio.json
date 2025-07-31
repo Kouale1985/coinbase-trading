@@ -1,0 +1,15 @@
+{
+  "starting_balance": 1000.0,
+  "current_cash": 850.0,
+  "position_value": 150.0,
+  "total_balance": 1000.0,
+  "total_return_pct": 0.0,
+  "realized_pnl": 0.0,
+  "open_positions": 1,
+  "max_positions": 4,
+  "total_trades": 2,
+  "winning_trades": 1,
+  "portfolio_exposure": 15.0,
+  "max_exposure": 75.0,
+  "updated_at": "2025-07-31T20:01:52.347792+00:00"
+}

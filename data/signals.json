@@ -1,0 +1,47 @@
+[
+  {
+    "pair": "BTC-USD",
+    "price": 118435.03,
+    "rsi": 40.27,
+    "ema_50": 118471.38,
+    "ema_uptrend": false,
+    "macd_line": -2.635498,
+    "signal_line": -2.371948,
+    "macd_bullish": false,
+    "atr": 78.32,
+    "volatility": 0.0007,
+    "action": "HOLD",
+    "can_buy": false,
+    "timestamp": "2025-07-31T20:01:52.347845+00:00"
+  },
+  {
+    "pair": "XLM-USD",
+    "price": 0.419202,
+    "rsi": 22.06,
+    "ema_50": 0.423037,
+    "ema_uptrend": false,
+    "macd_line": -0.001173,
+    "signal_line": -0.001056,
+    "macd_bullish": false,
+    "atr": 0.001601,
+    "volatility": 0.0038,
+    "action": "HOLD",
+    "can_buy": false,
+    "timestamp": "2025-07-31T20:01:52.347847+00:00"
+  },
+  {
+    "pair": "ETH-USD",
+    "price": 3860.85,
+    "rsi": 40.97,
+    "ema_50": 3861.27,
+    "ema_uptrend": false,
+    "macd_line": -0.46243,
+    "signal_line": -0.416187,
+    "macd_bullish": false,
+    "atr": 5.39,
+    "volatility": 0.0014,
+    "action": "HOLD",
+    "can_buy": false,
+    "timestamp": "2025-07-31T20:01:52.347849+00:00"
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "pair": "XLM-USD",
+    "type": "BUY",
+    "price": 0.42,
+    "quantity": 357.14,
+    "total": 150.0,
+    "timestamp": "2025-07-31T19:45:00Z",
+    "reason": "RSI oversold + EMA break"
+  }
+]
