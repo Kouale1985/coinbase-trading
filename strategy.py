@@ -77,17 +77,41 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
     
     return macd_line, signal_line, histogram
 
-def rsi(prices, period=14):
-    """Calculate Relative Strength Index (RSI)"""
+def rsi(prices, period=14, exclude_current=True):
+    """
+    Calculate Relative Strength Index (RSI) using Wilder's method
+    This matches Coinbase's RSI calculation more closely
+    
+    Args:
+        prices: List of closing prices
+        period: RSI period (default 14)
+        exclude_current: If True, exclude the last candle (current/live candle)
+    """
+    if exclude_current and len(prices) > 1:
+        # Exclude current candle to match Coinbase UI behavior
+        prices = prices[:-1]
+    
     if len(prices) < period + 1:
         return None
     
+    # Calculate price changes
     deltas = np.diff(prices)
     gains = np.where(deltas > 0, deltas, 0)
     losses = np.where(deltas < 0, -deltas, 0)
     
-    avg_gain = np.mean(gains[-period:])
-    avg_loss = np.mean(losses[-period:])
+    # Wilder's RSI uses EMA-style smoothing, not simple averages
+    # Initial average (first period)
+    initial_avg_gain = np.mean(gains[:period])
+    initial_avg_loss = np.mean(losses[:period])
+    
+    # Apply Wilder's smoothing for subsequent periods
+    avg_gain = initial_avg_gain
+    avg_loss = initial_avg_loss
+    
+    # Wilder's smoothing: new_avg = (previous_avg * (period-1) + current_value) / period
+    for i in range(period, len(gains)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
     
     if avg_loss == 0:
         return 100
@@ -121,8 +145,16 @@ def enhanced_should_buy(candles, current_price):
     except Exception as e:
         return False, f"Data parsing error: {e}"
     
-    # 1. RSI Filter
-    current_rsi = rsi(closes)
+    # 1. RSI Filter (with debug info)
+    current_rsi = rsi(closes, exclude_current=True)  # Exclude current candle like Coinbase
+    current_rsi_with_live = rsi(closes, exclude_current=False)  # Include current candle
+    
+    # Debug logging for RSI comparison
+    print(f"🔍 RSI Debug - Last 5 closes: {[f'{c:.6f}' for c in closes[-5:]]}", flush=True)
+    print(f"🔍 RSI without current candle: {current_rsi:.2f}" if current_rsi else "🔍 RSI without current candle: N/A", flush=True)
+    print(f"🔍 RSI with current candle: {current_rsi_with_live:.2f}" if current_rsi_with_live else "🔍 RSI with current candle: N/A", flush=True)
+    print(f"🔍 Compare with Coinbase UI RSI for verification", flush=True)
+    
     if current_rsi is None or current_rsi >= 30:
         rsi_display = current_rsi if current_rsi is not None else "N/A"
         return False, f"RSI not oversold: {rsi_display:.2f}" if current_rsi is not None else f"RSI not oversold: {rsi_display}"
@@ -175,7 +207,7 @@ def enhanced_should_sell(candles, current_price, entry_price):
         return False, "HOLD", f"Data parsing error: {e}"
     
     # RSI Overbought Check
-    current_rsi = rsi(closes)
+    current_rsi = rsi(closes, exclude_current=True)  # Use same method as buy logic
     if current_rsi is not None and current_rsi > 70:
         return True, "SELL (RSI)", f"RSI overbought: {current_rsi:.2f}"
     
@@ -226,7 +258,7 @@ def should_buy(candles):
             return False
             
         closes = [float(c.close) for c in candle_data]
-        current_rsi = rsi(closes)
+        current_rsi = rsi(closes, exclude_current=True)  # Use improved RSI
         return current_rsi is not None and current_rsi < 30
     except Exception:
         return False
@@ -244,7 +276,7 @@ def should_sell(candles):
             return False
             
         closes = [float(c.close) for c in candle_data]
-        current_rsi = rsi(closes)
+        current_rsi = rsi(closes, exclude_current=True)  # Use improved RSI
         return current_rsi is not None and current_rsi > 70
     except Exception:
         return False
