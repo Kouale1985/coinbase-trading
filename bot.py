@@ -1164,9 +1164,9 @@ async def main_loop():
         try:
             print(f"\n⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
             
-            # Frequent resync every 2 loops (roughly every 12 minutes if LOOP_SECONDS=360)
-            if loop_count % 2 == 0:
-                position_tracker.periodic_resync()
+            # Balance check every loop (roughly every 6 minutes if LOOP_SECONDS=360)
+            # Detects deposits, manual trades, and external changes quickly
+            position_tracker.periodic_resync()
             
             await run_bot()
             loop_count += 1
