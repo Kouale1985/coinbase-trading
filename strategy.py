@@ -100,6 +100,10 @@ def rsi(closes, period=14):
     gains = [max(delta, 0) for delta in deltas]
     losses = [abs(min(delta, 0)) for delta in deltas]
     
+    # Debug output for RSI calculation
+    print(f"🔍 RSI Debug: Using last {len(recent_prices)} prices: {[f'{p:.4f}' for p in recent_prices[-5:]]}")
+    print(f"🔍 RSI Debug: {len(deltas)} deltas, gains sum: {sum(gains):.6f}, losses sum: {sum(losses):.6f}")
+    
     # Calculate Simple Moving Average (exactly 14 deltas)
     avg_gain = sum(gains) / period
     avg_loss = sum(losses) / period
