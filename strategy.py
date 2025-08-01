@@ -79,11 +79,11 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 
 def rsi(closes, period=14):
     """
-    Calculate RSI using Wilder's original method - the true industry standard
-    This is what most professional trading platforms (including Coinbase) actually use
+    Calculate RSI using SMA method - matches Coinbase UI exactly
+    Coinbase UI uses Simple Moving Average (SMA), not Wilder's smoothing
     
     Args:
-        closes: List of closing prices  
+        closes: List of closing prices (including live price)
         period: RSI period (default 14)
     """
     if len(closes) < period + 1:
@@ -92,29 +92,22 @@ def rsi(closes, period=14):
     # Convert all prices to float
     prices = [float(price) for price in closes]
     
-    # Calculate price changes
-    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+    # Calculate price changes (deltas)
+    deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
     
     # Separate gains and losses
     gains = [max(delta, 0) for delta in deltas]
     losses = [abs(min(delta, 0)) for delta in deltas]
     
-    # Wilder's RSI: Initial SMA for first period, then Wilder's smoothing
     if len(gains) < period:
         return 50  # Not enough data
     
-    # Step 1: Calculate initial averages using SMA for first 'period' values
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
+    # Use Simple Moving Average for the most recent 'period' values
+    recent_gains = gains[-period:]
+    recent_losses = losses[-period:]
     
-    # Step 2: Apply Wilder's smoothing for remaining periods
-    for i in range(period, len(gains)):
-        gain = gains[i]
-        loss = losses[i]
-        
-        # Wilder's smoothing formula: ((previous_avg * (period-1)) + current_value) / period
-        avg_gain = ((avg_gain * (period - 1)) + gain) / period
-        avg_loss = ((avg_loss * (period - 1)) + loss) / period
+    avg_gain = sum(recent_gains) / period
+    avg_loss = sum(recent_losses) / period
     
     # Calculate RSI
     if avg_loss == 0:
@@ -145,8 +138,11 @@ def enhanced_should_buy(candles, pair, config, current_price):
         highs = [float(c.high) for c in candle_data]
         lows = [float(c.low) for c in candle_data]
         
+        # Add current live price to closes for RSI calculation (matches Coinbase UI)
+        closes_with_live = closes + [current_price]
+        
         # Calculate indicators
-        current_rsi = rsi(closes)
+        current_rsi = rsi(closes_with_live)
         ema_50 = ema(closes, 50)
         macd_line, signal_line, _ = macd(closes)
         current_atr = atr(highs, lows, closes)
@@ -157,9 +153,9 @@ def enhanced_should_buy(candles, pair, config, current_price):
         # Debug logging
         print(f"🔍 RSI Debug - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
         print(f"🔍 Last candle timestamp: {candle_data[-1].start}")
-        print(f"🔍 RSI (Wilder's method): {current_rsi:.2f}")
-        print(f"🔍 Should match Coinbase UI RSI (Length: 14, Wilder's smoothing)")
-        print(f"🔍 Using only COMPLETED candles (no live/current candle included)")
+        print(f"🔍 RSI (SMA method): {current_rsi:.2f}")
+        print(f"🔍 Should match Coinbase UI RSI (Length: 14, SMA smoothing)")
+        print(f"🔍 Using COMPLETED candles + LIVE price (matches Coinbase UI)")
         
         # EMA trend check
         ema_uptrend = current_price > ema_50
