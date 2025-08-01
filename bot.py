@@ -619,22 +619,35 @@ else:
 
 # === Fetch candle data ===
 def fetch_candles(pair):
-    """Fetch candle data for the specified pair"""
+    """Fetch candle data for the specified pair with proper timestamp alignment"""
     try:
         now = datetime.now(timezone.utc)
-        # Fetch 200+ candles for proper RSI initialization (1000 minutes = ~16.7 hours for 5-min candles)
-        # This ensures proper Wilder's RSI smoothing that matches Coinbase UI
-        start = now - timedelta(minutes=1000)
+        
+        # 🔧 CRITICAL FIX: Only use completed 5-minute candles
+        # Round down to the last completed 5-minute interval
+        minutes_past_hour = now.minute
+        last_completed_5min = (minutes_past_hour // 5) * 5
+        
+        # Create the end time for the last completed 5-minute candle
+        end_time = now.replace(minute=last_completed_5min, second=0, microsecond=0)
+        
+        # If we're in the first 30 seconds of a new 5-min candle, go back one more interval
+        if now.minute % 5 == 0 and now.second < 30:
+            end_time = end_time - timedelta(minutes=5)
+        
+        # Fetch 200+ candles for proper RSI initialization 
+        start_time = end_time - timedelta(minutes=1000)
         
         # Convert to Unix timestamps (seconds since epoch)
-        start_unix = int(start.timestamp())
-        end_unix = int(now.timestamp())
+        start_unix = int(start_time.timestamp())
+        end_unix = int(end_time.timestamp())
         
-        print(f"🕐 Fetching {GRANULARITY} candles for {pair} from {start.isoformat()} to {now.isoformat()}", flush=True)
-        print(f"   📊 Unix timestamps: start={start_unix}, end={end_unix}, granularity={GRANULARITY}", flush=True)
-        print(f"   📈 Data window: ~200 candles for proper RSI initialization", flush=True)
+        print(f"🕐 Fetching {GRANULARITY} candles for {pair}", flush=True)
+        print(f"   📊 From: {start_time.isoformat()} To: {end_time.isoformat()}", flush=True)
+        print(f"   ⏰ Last completed candle ends at: {end_time.strftime('%H:%M')} UTC", flush=True)
+        print(f"   📈 Data window: ~200 completed candles (no live candle)", flush=True)
         
-        candles = client.get_candles(  # Remove await
+        candles = client.get_candles(
             product_id=pair,
             start=start_unix,
             end=end_unix,

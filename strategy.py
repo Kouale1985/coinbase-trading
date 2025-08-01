@@ -149,8 +149,10 @@ def enhanced_should_buy(candles, pair, config, current_price):
         
         # Debug logging
         print(f"🔍 RSI Debug - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
+        print(f"🔍 Last candle timestamp: {candle_data[-1].start}")
         print(f"🔍 RSI (SMA method): {current_rsi:.2f}")
         print(f"🔍 Should match Coinbase UI RSI (Length: 14, SMA smoothing)")
+        print(f"🔍 Using only COMPLETED candles (no live/current candle included)")
         
         # EMA trend check
         ema_uptrend = current_price > ema_50
