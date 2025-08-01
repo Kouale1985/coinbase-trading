@@ -89,51 +89,7 @@ def exponential_moving_average(values, period):
     
     return ema[-1]
 
-def rsi(closes, period=14):
-    """
-    Calculate RSI using EMA-based smoothing for crypto markets
-    More responsive to recent price changes than SMA method
-    
-    Args:
-        closes: List of closing prices (including live price)
-        period: RSI period (default 14)
-    """
-    if len(closes) < period + 1:
-        return 0
-
-    # Convert to float
-    prices = [float(price) for price in closes]
-    
-    # Calculate all price deltas
-    import numpy as np
-    deltas = np.diff(prices)
-    
-    # Separate gains and losses
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
-    
-    # Need at least 'period' deltas for EMA calculation
-    if len(gains) < period:
-        return 50  # Not enough data
-    
-    # Use EMA smoothing for gains and losses (more responsive for crypto)
-    ema_gain = exponential_moving_average(gains[-period:], period)
-    ema_loss = exponential_moving_average(losses[-period:], period)
-    
-    # Debug output for RSI calculation
-    print(f"🔍 RSI Debug: Using last {period} deltas from {len(prices)} prices")
-    print(f"🔍 RSI Debug: EMA gain: {ema_gain:.6f}, EMA loss: {ema_loss:.6f}")
-    
-    # Calculate RSI using EMA smoothed values
-    if ema_loss == 0:
-        return 100.0  # No losses = RSI 100
-    if ema_gain == 0:
-        return 0.0    # No gains = RSI 0
-    
-    rs = ema_gain / ema_loss
-    rsi_value = 100 - (100 / (1 + rs))
-    
-    return round(rsi_value, 2)
+# RSI function removed - using simplified EMA + MACD strategy
 
 def enhanced_should_buy(candles, pair, config, current_price):
     """
@@ -291,37 +247,9 @@ def get_atr_stop_loss(candles, entry_price, multiplier=1.5):
 
 # Legacy functions for backward compatibility
 def should_buy(candles):
-    """Legacy function - basic RSI only"""
-    try:
-        if hasattr(candles, 'candles') and candles.candles:
-            candle_data = candles.candles
-        else:
-            candle_data = candles
-            
-        # Check if we have enough data
-        if not candle_data or len(candle_data) < 15:
-            return False
-            
-        closes = [float(c.close) for c in candle_data]
-        current_rsi = rsi(closes)  # Use improved RSI
-        return current_rsi is not None and current_rsi < 30
-    except Exception:
-        return False
+    """Legacy function - disabled (RSI removed)"""
+    return False  # Always return False since we use enhanced_should_buy now
 
 def should_sell(candles):
-    """Legacy function - basic RSI only"""
-    try:
-        if hasattr(candles, 'candles') and candles.candles:
-            candle_data = candles.candles
-        else:
-            candle_data = candles
-            
-        # Check if we have enough data
-        if not candle_data or len(candle_data) < 15:
-            return False
-            
-        closes = [float(c.close) for c in candle_data]
-        current_rsi = rsi(closes)  # Use improved RSI
-        return current_rsi is not None and current_rsi > 70
-    except Exception:
-        return False
+    """Legacy function - disabled (RSI removed)"""
+    return False  # Always return False since we use enhanced_should_sell now

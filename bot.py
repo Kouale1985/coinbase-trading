@@ -9,7 +9,7 @@ import json
 from flask import Flask, send_file, jsonify
 
 from coinbase.rest import RESTClient
-from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
+from strategy import should_buy, should_sell, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
 from config import CONFIG
 
 # === Core Trading Functions ===
@@ -968,12 +968,12 @@ async def run_bot():
                 
                 config = CONFIG.get(pair, CONFIG["DEFAULT"])
                 
-                # Get technical indicators
+                # Get technical indicators (RSI removed)
                 closes = [float(c.close) for c in candle_data]
                 highs = [float(c.high) for c in candle_data]
                 lows = [float(c.low) for c in candle_data]
                 
-                current_rsi = rsi(closes)
+                # RSI removed - using simplified EMA + MACD strategy
                 ema_50 = ema(closes, 50)
                 macd_line, signal_line, _ = macd(closes)
                 current_atr = atr(highs, lows, closes)
@@ -985,7 +985,6 @@ async def run_bot():
                 signal_data = {
                     "pair": pair,
                     "price": current_price,
-                    "rsi": current_rsi,
                     "ema_50": ema_50,
                     "ema_uptrend": bool(ema_50 and current_price > ema_50),
                     "macd_line": macd_line,
