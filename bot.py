@@ -64,13 +64,17 @@ def fetch_real_coinbase_balances():
                         real_time_price = get_real_time_price(pair)
                         if real_time_price:
                             value_usd = available_balance * real_time_price
-                            crypto_holdings[currency] = {
-                                "quantity": available_balance,
-                                "price_usd": real_time_price,
-                                "value_usd": value_usd
-                            }
-                            total_value_usd += value_usd
-                            print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
+                            # Only track positions worth more than $5 (ignore dust)
+                            if value_usd >= 5.0:
+                                crypto_holdings[currency] = {
+                                    "quantity": available_balance,
+                                    "price_usd": real_time_price,
+                                    "value_usd": value_usd
+                                }
+                                total_value_usd += value_usd
+                                print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
+                            else:
+                                print(f"💸 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f} (dust - ignored)", flush=True)
                 except Exception as e:
                     print(f"⚠️ Could not price {currency}: {e}", flush=True)
         
@@ -132,6 +136,26 @@ class PositionTracker:
                         }
         else:
             print(f"⚠️ Using simulation mode: ${self.cash_balance:.2f}", flush=True)
+        
+        # Clean up dust positions (less than $5 value)
+        self.cleanup_dust_positions()
+    
+    def cleanup_dust_positions(self):
+        """Remove positions with negligible value (dust) to clean up portfolio display"""
+        dust_pairs = []
+        
+        for pair, position in self.positions.items():
+            position_value = position["entry_price"] * position["current_quantity"]
+            if position_value < 5.0:  # Less than $5 value
+                dust_pairs.append(pair)
+                print(f"💸 Removing dust position: {pair} (${position_value:.2f})", flush=True)
+        
+        # Remove dust positions
+        for pair in dust_pairs:
+            del self.positions[pair]
+        
+        if dust_pairs:
+            print(f"✅ Cleaned up {len(dust_pairs)} dust position(s)", flush=True)
         
     def calculate_total_balance(self):
         """Calculate total portfolio value (cash + positions)"""
@@ -391,10 +415,10 @@ class PositionTracker:
                     self.cash_balance = real_usd_balance
                     print(f"✅ Cash balance resynced", flush=True)
                 
-                # Check for new crypto holdings not tracked by bot
+                # Check for new crypto holdings not tracked by bot (ignore dust)
                 for currency, holding in real_crypto_holdings.items():
                     pair = f"{currency}-USD"
-                    if pair in TRADING_PAIRS and pair not in self.positions:
+                    if pair in TRADING_PAIRS and pair not in self.positions and holding["value_usd"] >= 5.0:
                         print(f"🆕 New {currency} holding detected - adding to tracking", flush=True)
                         self.positions[pair] = {
                             "entry_price": holding["price_usd"],
@@ -408,6 +432,9 @@ class PositionTracker:
                             "trailing_stop_price": None,
                             "strategy_reason": "New external holding"
                         }
+                
+                # Clean up any existing dust positions
+                self.cleanup_dust_positions()
         except Exception as e:
             print(f"⚠️ Resync failed: {e}", flush=True)
         
