@@ -2,9 +2,11 @@ import os
 import sys
 import asyncio
 import csv
+import threading
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
+from flask import Flask, send_file, jsonify
 
 from coinbase.rest import RESTClient
 from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
@@ -417,6 +419,59 @@ def export_trade_history_to_csv(trades, filename="trade_history.csv"):
 # Initialize position tracker and signal throttle
 position_tracker = PositionTracker()
 signal_throttle = SignalThrottle(throttle_minutes=15)  # 15-minute throttle per pair
+
+# === Flask Web Server for CSV Download ===
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    """Basic status page"""
+    return jsonify({
+        "status": "Trading Bot Running",
+        "endpoints": {
+            "download_trades": "/download-trades",
+            "bot_status": "/status"
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+@app.route('/download-trades')
+def download_trades():
+    """Download trade history CSV file"""
+    csv_path = "trade_history.csv"
+    if os.path.exists(csv_path):
+        return send_file(csv_path, 
+                        as_attachment=True, 
+                        download_name=f"trade_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mimetype='text/csv')
+    else:
+        return jsonify({"error": "No trade history found", "message": "CSV file does not exist yet"}), 404
+
+@app.route('/status')
+def bot_status():
+    """Get current bot status and recent trades"""
+    csv_path = "trade_history.csv"
+    
+    status = {
+        "bot_running": True,
+        "current_time": datetime.now(timezone.utc).isoformat(),
+        "total_pnl": position_tracker.total_pnl,
+        "cash_balance": position_tracker.cash_balance,
+        "open_positions": len(position_tracker.positions),
+        "total_trades": len(position_tracker.trade_history),
+        "csv_exists": os.path.exists(csv_path)
+    }
+    
+    # Add recent trades if available
+    if position_tracker.trade_history:
+        status["recent_trades"] = position_tracker.trade_history[-5:]  # Last 5 trades
+    
+    return jsonify(status)
+
+def run_flask_server():
+    """Run Flask server in a separate thread"""
+    port = int(os.environ.get("PORT", 10000))  # Render uses PORT env var
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 # === DEBUG PRINTS: Confirm startup and env ===
 print("✅ bot.py loaded", flush=True)
@@ -921,6 +976,12 @@ async def run_bot():
 async def main_loop():
     """Main trading loop"""
     print("🔄 Starting trading loop...", flush=True)
+    
+    # Start Flask server in a separate thread
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    print("🌐 Web server started for CSV downloads", flush=True)
+    
     while True:
         try:
             print(f"\n⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
