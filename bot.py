@@ -966,6 +966,10 @@ def analyze_and_trade(pair, candles):
                         )
                         print(f"✅ BUY ORDER PLACED: {order_result.order_id}", flush=True)
                         position_tracker.open_position(pair, current_price, current_atr)
+                        
+                        # Immediate balance sync after trade execution
+                        print("🔄 Syncing balances after BUY order...", flush=True)
+                        position_tracker.periodic_resync()
                     
                 except Exception as e:
                     print(f"❌ BUY ORDER FAILED for {pair}: {e}", flush=True)
@@ -1004,6 +1008,10 @@ def analyze_and_trade(pair, candles):
                             position_tracker.partial_close_position(pair, current_price, 0.30, "TIER_2", reason="TIER_2_PROFIT")
                         else:
                             position_tracker.close_position(pair, current_price, reason=action)
+                            
+                        # Immediate balance sync after trade execution
+                        print("🔄 Syncing balances after SELL order...", flush=True)
+                        position_tracker.periodic_resync()
                             
                     else:
                         print(f"⚠️ No position to sell for {pair}", flush=True)
@@ -1156,8 +1164,8 @@ async def main_loop():
         try:
             print(f"\n⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
             
-            # Periodic resync every 10 loops (roughly every hour if LOOP_SECONDS=360)
-            if loop_count % 10 == 0:
+            # Frequent resync every 2 loops (roughly every 12 minutes if LOOP_SECONDS=360)
+            if loop_count % 2 == 0:
                 position_tracker.periodic_resync()
             
             await run_bot()
