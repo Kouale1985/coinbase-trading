@@ -135,6 +135,7 @@ class PositionTracker:
                         }
         else:
             # print(f"⚠️ Using simulation mode: ${self.cash_balance:.2f}", flush=True)  # Removed noise
+            pass
         
         # Clean up dust positions (less than $5 value)
         self.cleanup_dust_positions()
