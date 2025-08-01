@@ -59,7 +59,7 @@ def fetch_real_coinbase_balances():
                 # Get current price for crypto holdings
                 try:
                     pair = f"{currency}-USD"
-                    if pair in ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]:
+                    if pair in TRADING_PAIRS:
                         real_time_price = get_real_time_price(pair)
                         if real_time_price:
                             value_usd = available_balance * real_time_price
@@ -752,9 +752,45 @@ except Exception as test_error:
 # === Config ===
 GRANULARITY = "FIVE_MINUTE"  # Changed from ONE_MINUTE for better signal quality with multi-filter strategy
 
-# Focused core pairs (override environment to prevent spam)
-FOCUSED_PAIRS = ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
-TRADING_PAIRS = os.getenv("TRADE_PAIRS", ",".join(FOCUSED_PAIRS)).split(",")
+# Dynamic trading pairs - discover available pairs from Coinbase
+def get_dynamic_trading_pairs():
+    """Get all available USD trading pairs from Coinbase for dynamic discovery"""
+    try:
+        products = client.get_products()
+        if not products or not hasattr(products, 'products'):
+            print("⚠️ Could not fetch products, using fallback pairs", flush=True)
+            return ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
+        
+        dynamic_pairs = []
+        for product in products.products:
+            if (product.base_currency_id != "USD" and 
+                product.quote_currency_id == "USD" and 
+                product.status == "online" and
+                not product.trading_disabled):
+                pair = f"{product.base_currency_id}-USD"
+                dynamic_pairs.append(pair)
+        
+        # Filter to reasonable pairs (avoid too many obscure ones)
+        popular_bases = {
+            "BTC", "ETH", "XRP", "ADA", "SOL", "DOGE", "DOT", "AVAX", "MATIC", 
+            "LINK", "UNI", "LTC", "ATOM", "XLM", "ALGO", "VET", "ICP", "FIL", 
+            "ETC", "OP", "ARB", "NEAR", "APT", "SUI", "SEI", "WLD", "PEPE",
+            "SHIB", "BCH", "HBAR", "TIA", "INJ", "TAO", "RENDER", "GRT", "SAND"
+        }
+        
+        filtered_pairs = [pair for pair in dynamic_pairs 
+                         if pair.replace("-USD", "") in popular_bases]
+        
+        print(f"🔍 Dynamic discovery found {len(filtered_pairs)} trading pairs", flush=True)
+        return filtered_pairs[:20]  # Limit to top 20 to avoid spam
+        
+    except Exception as e:
+        print(f"⚠️ Dynamic pair discovery failed: {e}", flush=True)
+        print("🔄 Using fallback core pairs", flush=True)
+        return ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
+
+# Get dynamic pairs or use environment override
+TRADING_PAIRS = os.getenv("TRADE_PAIRS", ",".join(get_dynamic_trading_pairs())).split(",")
 
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
