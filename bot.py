@@ -23,16 +23,55 @@ MAX_PER_TRADE = 0.25                # No more than 25% per trade
 MIN_TRADE_SIZE = 50                 # Don't enter trades smaller than this
 RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
 
-# TODO: Add real account balance query
-# def get_real_account_balance():
-#     """Query actual USD balance from Coinbase account"""
-#     try:
-#         accounts = client.get_accounts()
-#         for account in accounts.accounts:
-#             if account.currency == "USD":
-#                 return float(account.available_balance.value)
-#     except Exception:
-#         return STARTING_BALANCE_USD
+# === Real-time Account Sync ===
+def fetch_real_coinbase_balances():
+    """Fetch real account balances from Coinbase API"""
+    try:
+        print("🔄 Fetching real Coinbase account balances...", flush=True)
+        accounts = client.get_accounts()
+        
+        if not accounts or not hasattr(accounts, 'accounts'):
+            print("❌ No accounts found", flush=True)
+            return None, {}
+        
+        usd_balance = 0.0
+        crypto_holdings = {}
+        total_value_usd = 0.0
+        
+        for account in accounts.accounts:
+            currency = account.currency
+            available_balance = float(account.available_balance.value)
+            
+            if currency == "USD":
+                usd_balance = available_balance
+                print(f"💰 USD Cash: ${usd_balance:.2f}", flush=True)
+            elif available_balance > 0:
+                # Get current price for crypto holdings
+                try:
+                    pair = f"{currency}-USD"
+                    if pair in ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]:
+                        real_time_price = get_real_time_price(pair)
+                        if real_time_price:
+                            value_usd = available_balance * real_time_price
+                            crypto_holdings[currency] = {
+                                "quantity": available_balance,
+                                "price_usd": real_time_price,
+                                "value_usd": value_usd
+                            }
+                            total_value_usd += value_usd
+                            print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
+                except Exception as e:
+                    print(f"⚠️ Could not price {currency}: {e}", flush=True)
+        
+        total_portfolio_value = usd_balance + total_value_usd
+        print(f"📊 Total Portfolio: ${total_portfolio_value:.2f} (Cash: ${usd_balance:.2f} + Crypto: ${total_value_usd:.2f})", flush=True)
+        
+        return usd_balance, crypto_holdings
+        
+    except Exception as e:
+        print(f"❌ Error fetching Coinbase balances: {e}", flush=True)
+        print(f"⚠️ Falling back to simulation mode with ${STARTING_BALANCE_USD}", flush=True)
+        return None, {}
 
 # === Position Tracker Class ===
 class PositionTracker:
