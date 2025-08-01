@@ -80,7 +80,7 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 def rsi(closes, period=14):
     """
     Calculate RSI using SMA method - matches Coinbase UI exactly
-    Uses only the last (period + 1) prices for precise 14-delta calculation
+    Uses strict 14-period window from last 15 prices only
     
     Args:
         closes: List of closing prices (including live price)
@@ -89,33 +89,38 @@ def rsi(closes, period=14):
     if len(closes) < period + 1:
         return 0
 
-    # Convert to float and use only the last (period + 1) closes
+    # Convert to float
     prices = [float(price) for price in closes]
-    recent_prices = prices[-(period + 1):]
     
-    # Calculate deltas from the recent price window only
-    deltas = [recent_prices[i] - recent_prices[i - 1] for i in range(1, len(recent_prices))]
+    # Use only the last period + 1 closes (15 prices for 14 deltas)
+    window = prices[-(period + 1):]
+    
+    # Calculate deltas from this strict window only
+    import numpy as np
+    deltas = np.diff(window)
     
     # Separate gains and losses
-    gains = [max(delta, 0) for delta in deltas]
-    losses = [abs(min(delta, 0)) for delta in deltas]
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
     
     # Debug output for RSI calculation
-    print(f"🔍 RSI Debug: Using last {len(recent_prices)} prices: {[f'{p:.4f}' for p in recent_prices[-5:]]}")
-    print(f"🔍 RSI Debug: {len(deltas)} deltas, gains sum: {sum(gains):.6f}, losses sum: {sum(losses):.6f}")
+    print(f"🔍 RSI Debug: Strict window of {len(window)} prices: {[f'{p:.4f}' for p in window[-5:]]}")
+    print(f"🔍 RSI Debug: {len(deltas)} deltas, gains sum: {np.sum(gains):.6f}, losses sum: {np.sum(losses):.6f}")
     
     # Calculate Simple Moving Average (exactly 14 deltas)
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
+    avg_gain = np.mean(gains)
+    avg_loss = np.mean(losses)
     
     # Calculate RSI
     if avg_loss == 0:
-        return 100
+        return 100.0  # No losses = RSI 100
+    if avg_gain == 0:
+        return 0.0    # No gains = RSI 0
     
     rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
+    rsi_value = 100 - (100 / (1 + rs))
     
-    return round(rsi, 2)
+    return round(rsi_value, 2)
 
 def enhanced_should_buy(candles, pair, config, current_price):
     """
