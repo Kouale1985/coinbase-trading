@@ -77,10 +77,22 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
     
     return macd_line, signal_line, histogram
 
+def exponential_moving_average(values, period):
+    """Calculate EMA for a list of values"""
+    import numpy as np
+    alpha = 2.0 / (period + 1)
+    ema = np.zeros_like(values)
+    ema[0] = values[0]
+    
+    for i in range(1, len(values)):
+        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+    
+    return ema[-1]
+
 def rsi(closes, period=14):
     """
-    Calculate RSI using SMA method - matches Coinbase UI exactly
-    Uses strict 14-period window from last 15 prices only
+    Calculate RSI using EMA-based smoothing for crypto markets
+    More responsive to recent price changes than SMA method
     
     Args:
         closes: List of closing prices (including live price)
@@ -92,32 +104,33 @@ def rsi(closes, period=14):
     # Convert to float
     prices = [float(price) for price in closes]
     
-    # Use only the last period + 1 closes (15 prices for 14 deltas)
-    window = prices[-(period + 1):]
-    
-    # Calculate deltas from this strict window only
+    # Calculate all price deltas
     import numpy as np
-    deltas = np.diff(window)
+    deltas = np.diff(prices)
     
     # Separate gains and losses
     gains = np.where(deltas > 0, deltas, 0)
     losses = np.where(deltas < 0, -deltas, 0)
     
+    # Need at least 'period' deltas for EMA calculation
+    if len(gains) < period:
+        return 50  # Not enough data
+    
+    # Use EMA smoothing for gains and losses (more responsive for crypto)
+    ema_gain = exponential_moving_average(gains[-period:], period)
+    ema_loss = exponential_moving_average(losses[-period:], period)
+    
     # Debug output for RSI calculation
-    print(f"🔍 RSI Debug: Strict window of {len(window)} prices: {[f'{p:.4f}' for p in window[-5:]]}")
-    print(f"🔍 RSI Debug: {len(deltas)} deltas, gains sum: {np.sum(gains):.6f}, losses sum: {np.sum(losses):.6f}")
+    print(f"🔍 RSI Debug: Using last {period} deltas from {len(prices)} prices")
+    print(f"🔍 RSI Debug: EMA gain: {ema_gain:.6f}, EMA loss: {ema_loss:.6f}")
     
-    # Calculate Simple Moving Average (exactly 14 deltas)
-    avg_gain = np.mean(gains)
-    avg_loss = np.mean(losses)
-    
-    # Calculate RSI
-    if avg_loss == 0:
+    # Calculate RSI using EMA smoothed values
+    if ema_loss == 0:
         return 100.0  # No losses = RSI 100
-    if avg_gain == 0:
+    if ema_gain == 0:
         return 0.0    # No gains = RSI 0
     
-    rs = avg_gain / avg_loss
+    rs = ema_gain / ema_loss
     rsi_value = 100 - (100 / (1 + rs))
     
     return round(rsi_value, 2)
@@ -167,8 +180,8 @@ def enhanced_should_buy(candles, pair, config, current_price):
         # Debug logging
         print(f"🔍 RSI Debug - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
         print(f"🔍 Last candle timestamp: {candle_data[-1].start}")
-        print(f"🔍 RSI (Enhanced SMA method): {current_rsi:.2f}")
-        print(f"🔍 Should be ~95% accurate vs Coinbase UI RSI (Length: 14, SMA)")
+        print(f"🔍 RSI (EMA-based method): {current_rsi:.2f}")
+        print(f"🔍 More responsive EMA smoothing for crypto markets")
         print(f"🔍 Using COMPLETED candles + ENHANCED live price sampling")
         
         # EMA trend check
