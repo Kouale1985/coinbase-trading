@@ -657,15 +657,15 @@ def run_flask_server():
     app.run(host="0.0.0.0", port=port, debug=False)
 
 # === DEBUG PRINTS: Confirm startup and env ===
-print("✅ bot.py loaded", flush=True)
+# print("✅ bot.py loaded", flush=True)  # Removed noise
 
 load_dotenv()  # Safe even on Render; does nothing if .env isn't found
 
 API_KEY = os.getenv("COINBASE_API_KEY_ID")
 API_SECRET = os.getenv("COINBASE_API_PRIVATE_KEY")
 
-print(f"🔑 COINBASE_API_KEY_ID: {API_KEY}", flush=True)
-print(f"🔐 COINBASE_API_PRIVATE_KEY: {API_SECRET[:30]}..." if API_SECRET else "🔐 COINBASE_API_PRIVATE_KEY: None", flush=True)
+# print(f"🔑 COINBASE_API_KEY_ID: {API_KEY}", flush=True)  # Removed noise
+# print(f"🔐 COINBASE_API_PRIVATE_KEY: {API_SECRET[:30]}..." if API_SECRET else "🔐 COINBASE_API_PRIVATE_KEY: None", flush=True)  # Removed noise
 
 # === Raise error if missing ===
 if not API_KEY or not API_SECRET:
