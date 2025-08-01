@@ -96,7 +96,7 @@ class PositionTracker:
         self.cash_balance = STARTING_BALANCE_USD  # Will be updated with real balance
         self.starting_balance = STARTING_BALANCE_USD
         self.real_crypto_holdings = {}  # Track existing crypto positions
-        self.sync_with_coinbase()  # Fetch real balances on startup
+        # Note: sync_with_coinbase() will be called after client is initialized
     
     def sync_with_coinbase(self):
         """Sync portfolio with real Coinbase account balances"""
@@ -442,7 +442,7 @@ class PositionTracker:
         """Print comprehensive portfolio summary"""
         open_positions = len(self.positions)
         total_trades = len(self.trade_history)
-        winning_trades = len([t for t in self.trade_history if t["pnl_usd"] > 0])
+        winning_trades = len([t for t in self.trade_history if t.get("pnl_usd") and float(t["pnl_usd"] or 0) > 0])
         
         total_balance = self.calculate_total_balance()
         position_value = total_balance - self.cash_balance
@@ -821,6 +821,11 @@ if not SIMULATION:
     print("📱 Check Coinbase Pro → Orders & Portfolio tabs", flush=True)
 else:
     print("✅ Safe mode: Only analyzing signals, no real trades", flush=True)
+
+# === Initialize Position Tracker ===
+position_tracker = PositionTracker()
+# Now sync with real Coinbase balances (client is ready)
+position_tracker.sync_with_coinbase()
 
 # === Fetch candle data ===
 def fetch_candles(pair):
