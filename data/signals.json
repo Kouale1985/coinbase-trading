@@ -3,97 +3,97 @@
     "pair": "BTC-USD",
     "price": 116610.91,
     "rsi": 64.0561517754505,
-    "ema_50": 116159.24728386245,
+    "ema_50": 116159.24503842322,
     "ema_uptrend": true,
-    "macd_line": 170.46369615047297,
-    "signal_line": 153.41732653542567,
+    "macd_line": 170.46369881537976,
+    "signal_line": 153.4173289338418,
     "macd_bullish": true,
     "atr": 222.75357142857476,
     "volatility_ratio": 0.001910229252379342,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 64.06",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.185521+00:00"
+    "timestamp": "2025-08-01T13:37:08.849602+00:00"
   },
   {
     "pair": "ETH-USD",
     "price": 3744.03,
     "rsi": 67.40729390131771,
-    "ema_50": 3716.4950875370705,
+    "ema_50": 3716.4950493948204,
     "ema_uptrend": true,
-    "macd_line": 9.845699310188593,
-    "signal_line": 8.861129379169734,
+    "macd_line": 9.845699355456873,
+    "signal_line": 8.861129419911185,
     "macd_bullish": true,
     "atr": 13.659285714285716,
     "volatility_ratio": 0.003648284259016545,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 67.41",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.284788+00:00"
+    "timestamp": "2025-08-01T13:37:08.930969+00:00"
   },
   {
     "pair": "XRP-USD",
     "price": 3.0525,
     "rsi": 61.105424769702864,
-    "ema_50": 3.028891518704729,
+    "ema_50": 3.028891498890573,
     "ema_uptrend": true,
-    "macd_line": 0.00848376118380978,
-    "signal_line": 0.007635385065428802,
+    "macd_line": 0.008483761207324747,
+    "signal_line": 0.007635385086592272,
     "macd_bullish": true,
     "atr": 0.015392857142857144,
     "volatility_ratio": 0.005042705042705042,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 61.11",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.375333+00:00"
+    "timestamp": "2025-08-01T13:37:09.023082+00:00"
   },
   {
     "pair": "ADA-USD",
     "price": 0.7503,
     "rsi": 59.1549295774648,
-    "ema_50": 0.7431551298987886,
+    "ema_50": 0.7431551051310935,
     "ema_uptrend": true,
-    "macd_line": 0.002606027164868241,
-    "signal_line": 0.002345424448381417,
+    "macd_line": 0.0026060271942626168,
+    "signal_line": 0.002345424474836355,
     "macd_bullish": true,
     "atr": 0.004085714285714296,
     "volatility_ratio": 0.005445440871270553,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 59.15",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.476370+00:00"
+    "timestamp": "2025-08-01T13:37:09.110280+00:00"
   },
   {
     "pair": "SOL-USD",
     "price": 175.42,
     "rsi": 63.888888888889014,
-    "ema_50": 172.95437380642554,
+    "ema_50": 172.95437281571768,
     "ema_uptrend": true,
-    "macd_line": 0.65778575432293,
-    "signal_line": 0.592007178890637,
+    "macd_line": 0.6577857554986792,
+    "signal_line": 0.5920071799488114,
     "macd_bullish": true,
     "atr": 0.8878571428571433,
     "volatility_ratio": 0.005061322214440448,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 63.89",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.571087+00:00"
+    "timestamp": "2025-08-01T13:37:09.192800+00:00"
   },
   {
     "pair": "DOGE-USD",
     "price": 0.21372,
     "rsi": 63.01369863013702,
-    "ema_50": 0.2110963792499499,
+    "ema_50": 0.2110963708289336,
     "ema_uptrend": true,
-    "macd_line": 0.0008839816808966505,
-    "signal_line": 0.0007955835128069854,
+    "macd_line": 0.0008839816908907394,
+    "signal_line": 0.0007955835218016655,
     "macd_bullish": true,
     "atr": 0.001252857142857147,
     "volatility_ratio": 0.005862142723456611,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 63.01",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.656617+00:00"
+    "timestamp": "2025-08-01T13:37:09.348681+00:00"
   },
   {
     "pair": "DOT-USD",
@@ -109,23 +109,23 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 61.70",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.741509+00:00"
+    "timestamp": "2025-08-01T13:37:09.447293+00:00"
   },
   {
     "pair": "AVAX-USD",
     "price": 22.85,
     "rsi": 62.82051282051282,
-    "ema_50": 22.58497596732606,
+    "ema_50": 22.58497497661827,
     "ema_uptrend": true,
-    "macd_line": 0.09550170314636475,
-    "signal_line": 0.08595153283172828,
+    "macd_line": 0.09550170432213889,
+    "signal_line": 0.085951533889925,
     "macd_bullish": true,
     "atr": 0.11857142857142884,
     "volatility_ratio": 0.0051891216005001675,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 62.82",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.843228+00:00"
+    "timestamp": "2025-08-01T13:37:09.538185+00:00"
   },
   {
     "pair": "MATIC-USD",
@@ -141,7 +141,7 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 49.15",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:06.956094+00:00"
+    "timestamp": "2025-08-01T13:37:09.630541+00:00"
   },
   {
     "pair": "LINK-USD",
@@ -157,39 +157,39 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 61.75",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.045903+00:00"
+    "timestamp": "2025-08-01T13:37:09.736678+00:00"
   },
   {
     "pair": "UNI-USD",
     "price": 9.506,
     "rsi": 61.49584487534632,
-    "ema_50": 9.416337059525533,
+    "ema_50": 9.416336910919366,
     "ema_uptrend": true,
-    "macd_line": 0.0329265724784662,
-    "signal_line": 0.02963391523061958,
+    "macd_line": 0.032926572654833564,
+    "signal_line": 0.02963391538935021,
     "macd_bullish": true,
     "atr": 0.0507857142857138,
     "volatility_ratio": 0.005342490457154829,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 61.50",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.150823+00:00"
+    "timestamp": "2025-08-01T13:37:09.843698+00:00"
   },
   {
     "pair": "LTC-USD",
     "price": 108.35,
     "rsi": 61.36363636363642,
-    "ema_50": 107.2335984584382,
+    "ema_50": 107.23359300954534,
     "ema_uptrend": true,
-    "macd_line": 0.4065001882192263,
-    "signal_line": 0.3658501693973037,
+    "macd_line": 0.4065001946859894,
+    "signal_line": 0.3658501752173905,
     "macd_bullish": true,
     "atr": 0.4507142857142859,
     "volatility_ratio": 0.0041597995912716745,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 61.36",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.240864+00:00"
+    "timestamp": "2025-08-01T13:37:09.927847+00:00"
   },
   {
     "pair": "ATOM-USD",
@@ -205,39 +205,39 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 66.43",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.331364+00:00"
+    "timestamp": "2025-08-01T13:37:10.040412+00:00"
   },
   {
     "pair": "XLM-USD",
     "price": 0.406688,
     "rsi": 54.75848563968672,
-    "ema_50": 0.4028116188148864,
+    "ema_50": 0.40281159890165974,
     "ema_uptrend": true,
-    "macd_line": 0.001136604444139433,
-    "signal_line": 0.0010229439997254898,
+    "macd_line": 0.0011366044677725284,
+    "signal_line": 0.0010229440209952756,
     "macd_bullish": true,
     "atr": 0.0025025714285714295,
     "volatility_ratio": 0.0061535413598911935,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 54.76",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.435571+00:00"
+    "timestamp": "2025-08-01T13:37:10.141731+00:00"
   },
   {
     "pair": "ALGO-USD",
     "price": 0.251,
     "rsi": 64.34782608695639,
-    "ema_50": 0.24717173975754186,
+    "ema_50": 0.24717172489692488,
     "ema_uptrend": true,
-    "macd_line": 0.0014693616554680156,
-    "signal_line": 0.001322425489921214,
+    "macd_line": 0.0014693616731046855,
+    "signal_line": 0.001322425505794217,
     "macd_bullish": true,
     "atr": 0.0016214285714285773,
     "volatility_ratio": 0.006459874786568037,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 64.35",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.518213+00:00"
+    "timestamp": "2025-08-01T13:37:10.290009+00:00"
   },
   {
     "pair": "VET-USD",
@@ -253,55 +253,55 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 58.24",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.597800+00:00"
+    "timestamp": "2025-08-01T13:37:10.366260+00:00"
   },
   {
     "pair": "ICP-USD",
     "price": 5.325,
     "rsi": 58.411214953271156,
-    "ema_50": 5.281325929899973,
+    "ema_50": 5.281325830829194,
     "ema_uptrend": true,
-    "macd_line": 0.018790339635200937,
-    "signal_line": 0.016911305671680844,
+    "macd_line": 0.01879033975277622,
+    "signal_line": 0.016911305777498598,
     "macd_bullish": true,
     "atr": 0.029357142857142766,
     "volatility_ratio": 0.005513078470824932,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 58.41",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.679944+00:00"
+    "timestamp": "2025-08-01T13:37:10.455637+00:00"
   },
   {
     "pair": "FIL-USD",
     "price": 2.439,
     "rsi": 58.585858585858745,
-    "ema_50": 2.408067662606716,
+    "ema_50": 2.408067613071326,
     "ema_uptrend": true,
-    "macd_line": 0.009581644580583859,
-    "signal_line": 0.008623480122525473,
+    "macd_line": 0.009581644639371945,
+    "signal_line": 0.008623480175434751,
     "macd_bullish": true,
     "atr": 0.014500000000000148,
     "volatility_ratio": 0.005945059450594567,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 58.59",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.779271+00:00"
+    "timestamp": "2025-08-01T13:37:10.542212+00:00"
   },
   {
     "pair": "ETC-USD",
     "price": 21.03,
     "rsi": 60.273972602739676,
-    "ema_50": 20.776334018409614,
+    "ema_50": 20.776332036994017,
     "ema_uptrend": true,
-    "macd_line": 0.09243207800596309,
-    "signal_line": 0.08318887020536679,
+    "macd_line": 0.09243208035751493,
+    "signal_line": 0.08318887232176345,
     "macd_bullish": true,
     "atr": 0.09714285714285735,
     "volatility_ratio": 0.004619251409550991,
     "can_buy": false,
     "buy_reason": "RSI not oversold: 60.27",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.867004+00:00"
+    "timestamp": "2025-08-01T13:37:10.623223+00:00"
   },
   {
     "pair": "OP-USD",
@@ -317,7 +317,7 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 66.67",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:07.979040+00:00"
+    "timestamp": "2025-08-01T13:37:10.702968+00:00"
   },
   {
     "pair": "ARB-USD",
@@ -333,6 +333,6 @@
     "can_buy": false,
     "buy_reason": "RSI not oversold: 60.00",
     "throttle_status": "\u2705 Ready",
-    "timestamp": "2025-08-01T13:36:08.077830+00:00"
+    "timestamp": "2025-08-01T13:37:10.787982+00:00"
   }
 ]
