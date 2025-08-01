@@ -79,8 +79,8 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 
 def rsi(closes, period=14):
     """
-    Calculate RSI using Simple Moving Average method - matches Coinbase UI exactly
-    Coinbase UI uses basic SMA-based RSI, not Wilder's exponential smoothing
+    Calculate RSI using Coinbase UI's exact SMA method
+    Uses 14-period SMA smoothing, matches Coinbase exactly
     
     Args:
         closes: List of closing prices
@@ -88,35 +88,32 @@ def rsi(closes, period=14):
     """
     if len(closes) < period + 1:
         return 0
+
+    # Convert all prices to float
+    prices = [float(price) for price in closes]
     
-    # Convert to numpy array for easier calculation
-    prices = np.array(closes, dtype=float)
-    
-    # Calculate price changes (deltas)
-    deltas = np.diff(prices)
+    # Calculate deltas for the last 'period' intervals
+    # Take the most recent period+1 prices to get period deltas
+    recent_prices = prices[-(period + 1):]
+    deltas = [recent_prices[i + 1] - recent_prices[i] for i in range(period)]
     
     # Separate gains and losses
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
-    
-    # Calculate Simple Moving Average of gains and losses over the period
-    # Use the last 'period' values for SMA calculation
-    if len(gains) >= period:
-        avg_gain = np.mean(gains[-period:])
-        avg_loss = np.mean(losses[-period:])
-    else:
-        avg_gain = np.mean(gains)
-        avg_loss = np.mean(losses)
-    
+    gains = [max(delta, 0) for delta in deltas]
+    losses = [abs(min(delta, 0)) for delta in deltas]
+
+    # Calculate Simple Moving Average of gains and losses
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+
     # Avoid division by zero
     if avg_loss == 0:
         return 100
-    
+
     # Calculate RS and RSI
     rs = avg_gain / avg_loss
-    rsi_val = 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
     
-    return float(rsi_val)
+    return round(rsi, 2)
 
 def enhanced_should_buy(candles, pair, config, current_price):
     """
