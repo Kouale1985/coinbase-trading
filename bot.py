@@ -333,15 +333,38 @@ else:
 def fetch_current_price(pair):
     """Fetch real-time current price for more accurate analysis"""
     try:
-        # Get current market data (real-time ticker)
-        ticker = client.get_product(product_id=pair)
-        if hasattr(ticker, 'price'):
-            return float(ticker.price)
-        elif hasattr(ticker, 'quote_increment'):
-            # Fallback: use latest trade data
+        # Method 1: Get 24hr stats (most reliable for current price)
+        try:
+            stats = client.get_product_stats(product_id=pair)
+            if hasattr(stats, 'last') and stats.last:
+                price = float(stats.last)
+                print(f"✅ Real-time price from 24hr stats: ${price:.6f}", flush=True)
+                return price
+        except Exception as stats_error:
+            print(f"🔄 24hr stats failed for {pair}: {stats_error}", flush=True)
+        
+        # Method 2: Get current market data (real-time ticker)
+        try:
+            ticker = client.get_product(product_id=pair)
+            if hasattr(ticker, 'price') and ticker.price:
+                price = float(ticker.price)
+                print(f"✅ Real-time price from ticker: ${price:.6f}", flush=True)
+                return price
+        except Exception as ticker_error:
+            print(f"🔄 Ticker failed for {pair}: {ticker_error}", flush=True)
+            
+        # Method 3: Get latest trade data
+        try:
             trades = client.get_public_trades(product_id=pair, limit=1)
-            if trades and len(trades.trades) > 0:
-                return float(trades.trades[0].price)
+            if trades and hasattr(trades, 'trades') and len(trades.trades) > 0:
+                price = float(trades.trades[0].price)
+                print(f"✅ Real-time price from trades: ${price:.6f}", flush=True)
+                return price
+        except Exception as trades_error:
+            print(f"🔄 Trades failed for {pair}: {trades_error}", flush=True)
+            
+        print(f"❌ All real-time price methods failed for {pair}", flush=True)
+        
     except Exception as e:
         print(f"⚠️ Error fetching current price for {pair}: {e}", flush=True)
     return None
