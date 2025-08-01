@@ -80,7 +80,7 @@ def macd(prices, fast_period=12, slow_period=26, signal_period=9):
 def rsi(closes, period=14):
     """
     Calculate RSI using SMA method - matches Coinbase UI exactly
-    Coinbase UI uses Simple Moving Average (SMA), not Wilder's smoothing
+    Uses only the last (period + 1) prices for precise 14-delta calculation
     
     Args:
         closes: List of closing prices (including live price)
@@ -89,25 +89,20 @@ def rsi(closes, period=14):
     if len(closes) < period + 1:
         return 0
 
-    # Convert all prices to float
+    # Convert to float and use only the last (period + 1) closes
     prices = [float(price) for price in closes]
+    recent_prices = prices[-(period + 1):]
     
-    # Calculate price changes (deltas)
-    deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
+    # Calculate deltas from the recent price window only
+    deltas = [recent_prices[i] - recent_prices[i - 1] for i in range(1, len(recent_prices))]
     
     # Separate gains and losses
     gains = [max(delta, 0) for delta in deltas]
     losses = [abs(min(delta, 0)) for delta in deltas]
     
-    if len(gains) < period:
-        return 50  # Not enough data
-    
-    # Use Simple Moving Average for the most recent 'period' values
-    recent_gains = gains[-period:]
-    recent_losses = losses[-period:]
-    
-    avg_gain = sum(recent_gains) / period
-    avg_loss = sum(recent_losses) / period
+    # Calculate Simple Moving Average (exactly 14 deltas)
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
     
     # Calculate RSI
     if avg_loss == 0:
