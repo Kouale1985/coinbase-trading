@@ -379,7 +379,7 @@ class SignalThrottle:
             minutes_remaining = int(time_remaining / 60)
             return f"⏳ {minutes_remaining}m remaining"
 
-# === Real-time Price Function ===
+# === Enhanced Real-time Price Function ===
 def get_real_time_price(pair):
     """Get real-time price using get_public_market_trades for the latest trade price"""
     try:
@@ -400,6 +400,28 @@ def get_real_time_price(pair):
     except Exception as e:
         print(f"⚠️ Failed to get real-time price for {pair}: {e}", flush=True)
         return None
+
+def get_enhanced_live_price(pair, samples=3, delay=0.5):
+    """Get enhanced live price with multiple samples for better RSI accuracy"""
+    import time
+    
+    prices = []
+    for i in range(samples):
+        price = get_real_time_price(pair)
+        if price is not None:
+            prices.append(price)
+        
+        # Small delay between samples (except for last sample)
+        if i < samples - 1:
+            time.sleep(delay)
+    
+    if prices:
+        # Return average of samples for smoother RSI calculation
+        avg_price = sum(prices) / len(prices)
+        print(f"🔍 Enhanced live price for {pair}: {prices} → Avg: {avg_price:.6f}", flush=True)
+        return avg_price
+    
+    return None
 
 # === CSV Export Function ===
 def export_trade_history_to_csv(trades, filename="trade_history.csv"):
