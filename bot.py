@@ -40,7 +40,17 @@ def fetch_real_coinbase_balances():
         
         for account in accounts.accounts:
             currency = account.currency
-            available_balance = float(account.available_balance.value)
+            # Handle different API response formats
+            try:
+                if hasattr(account.available_balance, 'value'):
+                    available_balance = float(account.available_balance.value)
+                elif isinstance(account.available_balance, dict):
+                    available_balance = float(account.available_balance.get('value', 0))
+                else:
+                    available_balance = float(account.available_balance)
+            except (AttributeError, TypeError, ValueError) as e:
+                print(f"⚠️ Could not parse balance for {currency}: {e}", flush=True)
+                available_balance = 0.0
             
             if currency == "USD":
                 usd_balance = available_balance
@@ -1060,56 +1070,6 @@ def analyze_and_trade(pair, candles):
                     
     except Exception as e:
         print(f"📊 {pair}: Error in analysis - {e}", flush=True)
-
-# === Real-time Account Sync ===
-def fetch_real_coinbase_balances():
-    """Fetch real account balances from Coinbase API"""
-    try:
-        print("🔄 Fetching real Coinbase account balances...", flush=True)
-        accounts = client.get_accounts()
-        
-        if not accounts or not hasattr(accounts, 'accounts'):
-            print("❌ No accounts found", flush=True)
-            return None, {}
-        
-        usd_balance = 0.0
-        crypto_holdings = {}
-        total_value_usd = 0.0
-        
-        for account in accounts.accounts:
-            currency = account.currency
-            available_balance = float(account.available_balance.value)
-            
-            if currency == "USD":
-                usd_balance = available_balance
-                print(f"💰 USD Cash: ${usd_balance:.2f}", flush=True)
-            elif available_balance > 0:
-                # Get current price for crypto holdings
-                try:
-                    pair = f"{currency}-USD"
-                    if pair in ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]:
-                        real_time_price = get_real_time_price(pair)
-                        if real_time_price:
-                            value_usd = available_balance * real_time_price
-                            crypto_holdings[currency] = {
-                                "quantity": available_balance,
-                                "price_usd": real_time_price,
-                                "value_usd": value_usd
-                            }
-                            total_value_usd += value_usd
-                            print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
-                except Exception as e:
-                    print(f"⚠️ Could not price {currency}: {e}", flush=True)
-        
-        total_portfolio_value = usd_balance + total_value_usd
-        print(f"📊 Total Portfolio: ${total_portfolio_value:.2f} (Cash: ${usd_balance:.2f} + Crypto: ${total_value_usd:.2f})", flush=True)
-        
-        return usd_balance, crypto_holdings
-        
-    except Exception as e:
-        print(f"❌ Error fetching Coinbase balances: {e}", flush=True)
-        print(f"⚠️ Falling back to simulation mode with ${STARTING_BALANCE_USD}", flush=True)
-        return None, {}
 
 # === Bot execution ===
 async def run_bot():
