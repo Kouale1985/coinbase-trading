@@ -155,34 +155,19 @@ def enhanced_should_buy(candles, pair, config, current_price):
         highs = [float(c.high) for c in candle_data]
         lows = [float(c.low) for c in candle_data]
         
-        # Get enhanced live price for better RSI accuracy (pseudo-tick sampling)
-        from bot import get_enhanced_live_price
-        enhanced_live_price = get_enhanced_live_price(pair, samples=2, delay=0.3)
-        
-        if enhanced_live_price is not None:
-            # Use enhanced live price for more accurate RSI
-            closes_with_live = closes + [enhanced_live_price]
-            print(f"🔍 Using enhanced live price: {enhanced_live_price:.6f} vs current: {current_price:.6f}")
-        else:
-            # Fallback to current price if enhanced sampling fails
-            closes_with_live = closes + [current_price]
-            print(f"🔍 Fallback to current price: {current_price:.6f}")
-        
-        # Calculate indicators
-        current_rsi = rsi(closes_with_live)
+        # Calculate indicators (RSI removed - focus on reliable signals)
+        # No more RSI calculation - it was inconsistent and blocking good trades
         ema_50 = ema(closes, 50)
         macd_line, signal_line, _ = macd(closes)
         current_atr = atr(highs, lows, closes)
         
-        if not all([current_rsi, ema_50, macd_line, signal_line, current_atr]):
+        if not all([ema_50, macd_line, signal_line, current_atr]):
             return False, "Indicator calculation failed"
         
-        # Debug logging
-        print(f"🔍 RSI Debug - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
+        # Debug logging (RSI removed)
+        print(f"🔍 Price Analysis - Total candles: {len(candle_data)}, Last 5 closes: {[c.close for c in candle_data[-5:]]}")
         print(f"🔍 Last candle timestamp: {candle_data[-1].start}")
-        print(f"🔍 RSI (EMA-based method): {current_rsi:.2f}")
-        print(f"🔍 More responsive EMA smoothing for crypto markets")
-        print(f"🔍 Using COMPLETED candles + ENHANCED live price sampling")
+        print(f"🔍 Strategy: MACD + EMA trend analysis (RSI removed for better performance)")
         
         # EMA trend check
         ema_uptrend = current_price > ema_50
@@ -204,40 +189,26 @@ def enhanced_should_buy(candles, pair, config, current_price):
         
         print()
         
-        # Enhanced buy conditions with SMART ADJUSTMENTS
-        # 🎯 SMART TWEAK #1: Slightly more aggressive RSI (30 -> 32)
-        rsi_oversold = current_rsi < 32  # Was 30, now 32 for more opportunities
+        # Simplified buy conditions (RSI removed)
+        # Focus on reliable trend and momentum indicators only
         
-        # 🎯 SMART TWEAK #2: Allow super oversold entries even with bearish MACD
-        super_oversold = current_rsi < 25  # Emergency oversold condition
-        
-        # Main buy conditions
-        basic_conditions = (
-            rsi_oversold and 
+        # Main buy conditions: EMA uptrend + MACD bullish + reasonable volatility
+        buy_conditions = (
             ema_uptrend and 
+            macd_bullish and
             volatility_ok and 
             current_price <= rebuy_zone
         )
         
-        # Enhanced condition: allow super oversold entries even with bearish MACD
-        emergency_oversold = (
-            super_oversold and 
-            ema_uptrend and 
-            volatility_ok and 
-            current_price <= rebuy_zone
-        )
+        # Final buy decision (simplified)
+        should_buy = buy_conditions
         
-        # Final buy decision
-        should_buy = (basic_conditions and macd_bullish) or emergency_oversold
-        
-        # Detailed reason logging
+        # Detailed reason logging (RSI removed)
         if not should_buy:
-            if not rsi_oversold:
-                reason = f"RSI not oversold: {current_rsi:.2f}"
-            elif not ema_uptrend:
+            if not ema_uptrend:
                 reason = f"Price below 50 EMA: ${current_price:.6f} <= ${ema_50:.6f}"
-            elif not macd_bullish and not super_oversold:
-                reason = f"MACD bearish and RSI not super oversold: {current_rsi:.2f}"
+            elif not macd_bullish:
+                reason = f"MACD bearish: {macd_line:.6f} <= {signal_line:.6f}"
             elif not volatility_ok:
                 reason = f"Volatility too high: {volatility_ratio*100:.2f}%"
             elif current_price > rebuy_zone:
@@ -245,10 +216,7 @@ def enhanced_should_buy(candles, pair, config, current_price):
             else:
                 reason = "Multiple filter failures"
         else:
-            if emergency_oversold:
-                reason = f"Emergency oversold entry: RSI {current_rsi:.2f} < 25"
-            else:
-                reason = f"All enhanced filters passed: RSI {current_rsi:.2f}, EMA trend ✅, MACD ✅"
+            reason = f"Entry filters passed: EMA uptrend ✅ | MACD bullish ✅ | Volatility OK ✅"
         
         return should_buy, reason
         
@@ -259,8 +227,7 @@ def enhanced_should_buy(candles, pair, config, current_price):
 def enhanced_should_sell(candles, current_price, entry_price):
     """
     Enhanced sell logic:
-    1. RSI > 70 (overbought) OR
-    2. ATR-based stop loss triggered
+    ATR-based stop loss triggered (RSI removed)
     """
     # Extract OHLC data
     try:
@@ -279,11 +246,7 @@ def enhanced_should_sell(candles, current_price, entry_price):
     except Exception as e:
         return False, "HOLD", f"Data parsing error: {e}"
     
-    # RSI Overbought Check (with debug info)
-    current_rsi = rsi(closes)  # Use same method as buy logic
-    print(f"🔍 SELL Check - RSI: {current_rsi:.2f} | Overbought Threshold: 70 | {'✅ SELL' if current_rsi and current_rsi > 70 else '❌ HOLD'}" if current_rsi else "🔍 SELL Check - RSI: N/A | ❌ HOLD", flush=True)
-    
-    # ATR-based Stop Loss Check (with debug info)
+    # ATR-based Stop Loss Check (RSI removed)
     current_atr = atr(highs, lows, closes)
     if current_atr is not None and entry_price is not None:
         atr_stop_loss = entry_price - (1.5 * current_atr)
@@ -294,16 +257,13 @@ def enhanced_should_sell(candles, current_price, entry_price):
     
     print(f"", flush=True)  # Empty line for readability
     
-    # Apply sell logic
-    if current_rsi is not None and current_rsi > 70:
-        return True, "SELL (RSI)", f"RSI overbought: {current_rsi:.2f}"
-    
+    # Apply sell logic (RSI removed)
     if current_atr is not None and entry_price is not None:
         atr_stop_loss = entry_price - (1.5 * current_atr)
         if current_price <= atr_stop_loss:
             return True, "SELL (ATR STOP)", f"ATR stop triggered: ${current_price:.6f} <= ${atr_stop_loss:.6f}"
     
-    return False, "HOLD", f"No sell conditions met - RSI: {current_rsi:.2f}" if current_rsi is not None else "No sell conditions met - RSI: N/A"
+    return False, "HOLD", "No emergency sell conditions met (ATR stop only)"
 
 def get_atr_stop_loss(candles, entry_price, multiplier=1.5):
     """Calculate ATR-based stop loss price"""
