@@ -27,7 +27,7 @@ RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
 def fetch_real_coinbase_balances():
     """Fetch real account balances from Coinbase API"""
     try:
-        print("🔄 Fetching real Coinbase account balances...", flush=True)
+        # print("🔄 Fetching real Coinbase account balances...", flush=True)  # Removed noise
         accounts = client.get_accounts()
         
         if not accounts or not hasattr(accounts, 'accounts'):
@@ -54,7 +54,7 @@ def fetch_real_coinbase_balances():
             
             if currency == "USD":
                 usd_balance = available_balance
-                print(f"💰 USD Cash: ${usd_balance:.2f}", flush=True)
+                # print(f"💰 USD Cash: ${usd_balance:.2f}", flush=True)  # Removed noise
             elif available_balance > 0:
                 # Get current price for crypto holdings
                 try:
@@ -71,14 +71,14 @@ def fetch_real_coinbase_balances():
                                     "value_usd": value_usd
                                 }
                                 total_value_usd += value_usd
-                                print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
+                                                # print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)  # Removed noise
                             else:
                                 print(f"💸 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f} (dust - ignored)", flush=True)
                 except Exception as e:
                     print(f"⚠️ Could not price {currency}: {e}", flush=True)
         
         total_portfolio_value = usd_balance + total_value_usd
-        print(f"📊 Total Portfolio: ${total_portfolio_value:.2f} (Cash: ${usd_balance:.2f} + Crypto: ${total_value_usd:.2f})", flush=True)
+        # print(f"📊 Total Portfolio: ${total_portfolio_value:.2f} (Cash: ${usd_balance:.2f} + Crypto: ${total_value_usd:.2f})", flush=True)  # Removed noise
         
         return usd_balance, crypto_holdings
         
@@ -100,7 +100,7 @@ class PositionTracker:
     
     def sync_with_coinbase(self):
         """Sync portfolio with real Coinbase account balances"""
-        print("🔄 Syncing with real Coinbase account...", flush=True)
+        # print("🔄 Syncing with real Coinbase account...", flush=True)  # Removed noise
         
         real_usd_balance, real_crypto_holdings = fetch_real_coinbase_balances()
         
@@ -109,7 +109,7 @@ class PositionTracker:
             old_balance = self.cash_balance
             self.cash_balance = real_usd_balance
             self.starting_balance = self.cash_balance  # Update starting point
-            print(f"✅ Cash Balance Updated: ${old_balance:.2f} → ${self.cash_balance:.2f}", flush=True)
+            # print(f"✅ Cash Balance Updated: ${old_balance:.2f} → ${self.cash_balance:.2f}", flush=True)  # Removed noise
             
             # Store real crypto holdings for reference
             self.real_crypto_holdings = real_crypto_holdings
@@ -120,7 +120,7 @@ class PositionTracker:
                 if pair in TRADING_PAIRS:
                     # Add existing crypto as a position
                     if pair not in self.positions:
-                        print(f"📍 Adding existing {currency} holding as tracked position", flush=True)
+                        # print(f"📍 Adding existing {currency} holding as tracked position", flush=True)  # Removed noise
                         self.positions[pair] = {
                             "entry_price": holding["price_usd"],
                             "current_quantity": holding["quantity"],
@@ -134,7 +134,7 @@ class PositionTracker:
                             "strategy_reason": "Existing Coinbase holding"
                         }
         else:
-            print(f"⚠️ Using simulation mode: ${self.cash_balance:.2f}", flush=True)
+            # print(f"⚠️ Using simulation mode: ${self.cash_balance:.2f}", flush=True)  # Removed noise
         
         # Clean up dust positions (less than $5 value)
         self.cleanup_dust_positions()
@@ -653,6 +653,11 @@ def bot_status():
 
 def run_flask_server():
     """Run Flask server in a separate thread"""
+    import logging
+    # Suppress Flask startup messages
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    
     port = int(os.environ.get("PORT", 10000))  # Render uses PORT env var
     app.run(host="0.0.0.0", port=port, debug=False)
 
@@ -679,7 +684,7 @@ client = None
 
 # Try Secret File First (Render Secret Files)
 if os.path.exists('cdp_api_key.json'):
-    print("🔍 Found local cdp_api_key.json file, reading it", flush=True)
+    # print("🔍 Found local cdp_api_key.json file, reading it", flush=True)  # Removed noise
     try:
         with open('cdp_api_key.json', 'r') as f:
             local_key_data = json.load(f)
@@ -781,7 +786,7 @@ def get_dynamic_trading_pairs():
         filtered_pairs = [pair for pair in dynamic_pairs 
                          if pair.replace("-USD", "") in popular_bases]
         
-        print(f"🔍 Dynamic discovery found {len(filtered_pairs)} trading pairs", flush=True)
+        # print(f"🔍 Dynamic discovery found {len(filtered_pairs)} trading pairs", flush=True)  # Removed noise
         return filtered_pairs[:20]  # Limit to top 20 to avoid spam
         
     except Exception as e:
@@ -1229,7 +1234,7 @@ async def main_loop():
     # Start Flask server in a separate thread
     flask_thread = threading.Thread(target=run_flask_server, daemon=True)
     flask_thread.start()
-    print("🌐 Web server started for CSV downloads", flush=True)
+    # print("🌐 Web server started for CSV downloads", flush=True)  # Removed noise
     
     loop_count = 0
     while True:
@@ -1254,7 +1259,7 @@ async def main_loop():
 
 # === Entry point ===
 if __name__ == "__main__":
-    print("🚀 Launching bot.py...", flush=True)
+    # print("🚀 Launching bot.py...", flush=True)  # Removed noise
     try:
         asyncio.run(main_loop())
     except KeyboardInterrupt:
