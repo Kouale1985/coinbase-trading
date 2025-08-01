@@ -13,6 +13,7 @@ from strategy import should_buy, should_sell, enhanced_should_buy, enhanced_shou
 from config import CONFIG
 
 # === Core Trading Functions ===
+TRADING_PAIRS = ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
 
 # === Professional Portfolio Management Constants ===
 STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
@@ -113,7 +114,7 @@ class PositionTracker:
             # Convert existing crypto holdings to bot positions if needed
             for currency, holding in real_crypto_holdings.items():
                 pair = f"{currency}-USD"
-                if pair in PAIRS:
+                if pair in TRADING_PAIRS:
                     # Add existing crypto as a position
                     if pair not in self.positions:
                         print(f"📍 Adding existing {currency} holding as tracked position", flush=True)
@@ -393,7 +394,7 @@ class PositionTracker:
                 # Check for new crypto holdings not tracked by bot
                 for currency, holding in real_crypto_holdings.items():
                     pair = f"{currency}-USD"
-                    if pair in PAIRS and pair not in self.positions:
+                    if pair in TRADING_PAIRS and pair not in self.positions:
                         print(f"🆕 New {currency} holding detected - adding to tracking", flush=True)
                         self.positions[pair] = {
                             "entry_price": holding["price_usd"],
