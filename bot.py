@@ -73,8 +73,25 @@ def export_signals_data(signals_data):
     """Export current market signals for dashboard"""
     ensure_data_directory()
     
-    with open('data/signals.json', 'w') as f:
-        json.dump(signals_data, f, indent=2)
+    # Handle potential datetime serialization issues
+    try:
+        with open('data/signals.json', 'w') as f:
+            json.dump(signals_data, f, indent=2, default=str)
+    except Exception as e:
+        print(f"⚠️ Error exporting signals data: {e}", flush=True)
+        # Try with datetime conversion fallback
+        cleaned_signals = []
+        for signal in signals_data:
+            cleaned_signal = {}
+            for key, value in signal.items():
+                if hasattr(value, 'isoformat'):
+                    cleaned_signal[key] = value.isoformat()
+                else:
+                    cleaned_signal[key] = value
+            cleaned_signals.append(cleaned_signal)
+        
+        with open('data/signals.json', 'w') as f:
+            json.dump(cleaned_signals, f, indent=2)
 
 def export_trade_history(position_tracker):
     """Export trade history for dashboard"""
