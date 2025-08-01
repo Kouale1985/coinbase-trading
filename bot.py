@@ -381,10 +381,22 @@ class SignalThrottle:
 
 # === Real-time Price Function ===
 def get_real_time_price(pair):
-    """Get real-time price using get_product_ticker instead of stale candle data"""
+    """Get real-time price using get_public_market_trades for the latest trade price"""
     try:
-        ticker = client.get_product_ticker(product_id=pair)
-        return float(ticker.price)
+        # Method 1: Try get_public_market_trades for latest trade price
+        trades = client.get_public_market_trades(product_id=pair, limit=1)
+        if trades and hasattr(trades, 'trades') and trades.trades:
+            return float(trades.trades[0].price)
+        
+        # Method 2: Fallback to get_best_bid_ask
+        bid_ask = client.get_best_bid_ask(product_ids=[pair])
+        if bid_ask and hasattr(bid_ask, 'pricebooks') and bid_ask.pricebooks:
+            pricebook = bid_ask.pricebooks[0]
+            if hasattr(pricebook, 'asks') and pricebook.asks:
+                # Use the best ask price as current market price
+                return float(pricebook.asks[0].price)
+        
+        return None
     except Exception as e:
         print(f"⚠️ Failed to get real-time price for {pair}: {e}", flush=True)
         return None
