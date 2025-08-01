@@ -40,8 +40,48 @@ class PositionTracker:
         self.positions = {}  # Enhanced tiered position tracking
         self.trade_history = []
         self.total_pnl = 0.0
-        self.cash_balance = STARTING_BALANCE_USD
+        self.cash_balance = STARTING_BALANCE_USD  # Will be updated with real balance
         self.starting_balance = STARTING_BALANCE_USD
+        self.real_crypto_holdings = {}  # Track existing crypto positions
+        self.sync_with_coinbase()  # Fetch real balances on startup
+    
+    def sync_with_coinbase(self):
+        """Sync portfolio with real Coinbase account balances"""
+        print("🔄 Syncing with real Coinbase account...", flush=True)
+        
+        real_usd_balance, real_crypto_holdings = fetch_real_coinbase_balances()
+        
+        if real_usd_balance is not None:
+            # Update cash balance with real USD balance
+            old_balance = self.cash_balance
+            self.cash_balance = real_usd_balance
+            self.starting_balance = self.cash_balance  # Update starting point
+            print(f"✅ Cash Balance Updated: ${old_balance:.2f} → ${self.cash_balance:.2f}", flush=True)
+            
+            # Store real crypto holdings for reference
+            self.real_crypto_holdings = real_crypto_holdings
+            
+            # Convert existing crypto holdings to bot positions if needed
+            for currency, holding in real_crypto_holdings.items():
+                pair = f"{currency}-USD"
+                if pair in PAIRS:
+                    # Add existing crypto as a position
+                    if pair not in self.positions:
+                        print(f"📍 Adding existing {currency} holding as tracked position", flush=True)
+                        self.positions[pair] = {
+                            "entry_price": holding["price_usd"],
+                            "current_quantity": holding["quantity"],
+                            "original_quantity": holding["quantity"],
+                            "tier_1_sold": 0,
+                            "tier_2_sold": 0,
+                            "tier_1_executed": False,
+                            "tier_2_executed": False,
+                            "highest_price": holding["price_usd"],
+                            "trailing_stop_price": None,
+                            "strategy_reason": "Existing Coinbase holding"
+                        }
+        else:
+            print(f"⚠️ Using simulation mode: ${self.cash_balance:.2f}", flush=True)
         
     def calculate_total_balance(self):
         """Calculate total portfolio value (cash + positions)"""
@@ -288,6 +328,38 @@ class PositionTracker:
     def get_position_status(self, pair):
         """Get current position status"""
         return self.positions.get(pair, None)
+    def periodic_resync(self):
+        """Periodically resync with Coinbase to ensure accuracy"""
+        try:
+            print("🔄 Periodic resync with Coinbase...", flush=True)
+            real_usd_balance, real_crypto_holdings = fetch_real_coinbase_balances()
+            
+            if real_usd_balance is not None:
+                balance_diff = abs(self.cash_balance - real_usd_balance)
+                if balance_diff > 1.0:  # Only update if difference > $1
+                    print(f"⚠️ Cash balance drift detected: ${self.cash_balance:.2f} → ${real_usd_balance:.2f}", flush=True)
+                    self.cash_balance = real_usd_balance
+                    print(f"✅ Cash balance resynced", flush=True)
+                
+                # Check for new crypto holdings not tracked by bot
+                for currency, holding in real_crypto_holdings.items():
+                    pair = f"{currency}-USD"
+                    if pair in PAIRS and pair not in self.positions:
+                        print(f"🆕 New {currency} holding detected - adding to tracking", flush=True)
+                        self.positions[pair] = {
+                            "entry_price": holding["price_usd"],
+                            "current_quantity": holding["quantity"],
+                            "original_quantity": holding["quantity"],
+                            "tier_1_sold": 0,
+                            "tier_2_sold": 0,
+                            "tier_1_executed": False,
+                            "tier_2_executed": False,
+                            "highest_price": holding["price_usd"],
+                            "trailing_stop_price": None,
+                            "strategy_reason": "New external holding"
+                        }
+        except Exception as e:
+            print(f"⚠️ Resync failed: {e}", flush=True)
         
     def print_summary(self):
         """Print comprehensive portfolio summary"""
@@ -942,6 +1014,56 @@ def analyze_and_trade(pair, candles):
     except Exception as e:
         print(f"📊 {pair}: Error in analysis - {e}", flush=True)
 
+# === Real-time Account Sync ===
+def fetch_real_coinbase_balances():
+    """Fetch real account balances from Coinbase API"""
+    try:
+        print("🔄 Fetching real Coinbase account balances...", flush=True)
+        accounts = client.get_accounts()
+        
+        if not accounts or not hasattr(accounts, 'accounts'):
+            print("❌ No accounts found", flush=True)
+            return None, {}
+        
+        usd_balance = 0.0
+        crypto_holdings = {}
+        total_value_usd = 0.0
+        
+        for account in accounts.accounts:
+            currency = account.currency
+            available_balance = float(account.available_balance.value)
+            
+            if currency == "USD":
+                usd_balance = available_balance
+                print(f"💰 USD Cash: ${usd_balance:.2f}", flush=True)
+            elif available_balance > 0:
+                # Get current price for crypto holdings
+                try:
+                    pair = f"{currency}-USD"
+                    if pair in ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]:
+                        real_time_price = get_real_time_price(pair)
+                        if real_time_price:
+                            value_usd = available_balance * real_time_price
+                            crypto_holdings[currency] = {
+                                "quantity": available_balance,
+                                "price_usd": real_time_price,
+                                "value_usd": value_usd
+                            }
+                            total_value_usd += value_usd
+                            print(f"🪙 {currency}: {available_balance:.6f} @ ${real_time_price:.4f} = ${value_usd:.2f}", flush=True)
+                except Exception as e:
+                    print(f"⚠️ Could not price {currency}: {e}", flush=True)
+        
+        total_portfolio_value = usd_balance + total_value_usd
+        print(f"📊 Total Portfolio: ${total_portfolio_value:.2f} (Cash: ${usd_balance:.2f} + Crypto: ${total_value_usd:.2f})", flush=True)
+        
+        return usd_balance, crypto_holdings
+        
+    except Exception as e:
+        print(f"❌ Error fetching Coinbase balances: {e}", flush=True)
+        print(f"⚠️ Falling back to simulation mode with ${STARTING_BALANCE_USD}", flush=True)
+        return None, {}
+
 # === Bot execution ===
 async def run_bot():
     """Run the bot for all trading pairs"""
@@ -1029,10 +1151,17 @@ async def main_loop():
     flask_thread.start()
     print("🌐 Web server started for CSV downloads", flush=True)
     
+    loop_count = 0
     while True:
         try:
             print(f"\n⏱️ Running bot at {datetime.now(timezone.utc).isoformat()}", flush=True)
+            
+            # Periodic resync every 10 loops (roughly every hour if LOOP_SECONDS=360)
+            if loop_count % 10 == 0:
+                position_tracker.periodic_resync()
+            
             await run_bot()
+            loop_count += 1
             print(f"⏸️ Waiting {LOOP_SECONDS} seconds until next analysis...", flush=True)
             await asyncio.sleep(LOOP_SECONDS)
         except KeyboardInterrupt:
