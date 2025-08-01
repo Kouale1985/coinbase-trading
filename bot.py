@@ -189,6 +189,7 @@ class PositionTracker:
         elif tier_name == "TIER_2":
             position["tier_2_sold"] = sell_quantity
             position["tier_2_executed"] = True
+        # Note: TIER_3 uses close_position() method, not partial_close_position()
         
         # Update cash balance
         self.cash_balance += sale_proceeds
