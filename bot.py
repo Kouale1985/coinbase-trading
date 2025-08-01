@@ -34,7 +34,7 @@ RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
 # === Position Tracker Class ===
 class PositionTracker:
     def __init__(self):
-        self.positions = {}  # {pair: {"entry_price": price, "quantity": qty, "timestamp": time}}
+        self.positions = {}  # Enhanced tiered position tracking
         self.trade_history = []
         self.total_pnl = 0.0
         self.cash_balance = STARTING_BALANCE_USD
@@ -43,7 +43,7 @@ class PositionTracker:
     def calculate_total_balance(self):
         """Calculate total portfolio value (cash + positions)"""
         position_value = sum(
-            pos["entry_price"] * pos["quantity"] for pos in self.positions.values()
+            pos["entry_price"] * pos["current_quantity"] for pos in self.positions.values()
         )
         return self.cash_balance + position_value
         
@@ -98,10 +98,17 @@ class PositionTracker:
             print(f"⚠️ Insufficient cash for {pair}: Need ${trade_value:.2f}, have ${self.cash_balance:.2f}", flush=True)
             return False
             
-        # Execute the trade
+        # Execute the trade with enhanced tiered tracking
         self.positions[pair] = {
             "entry_price": price,
-            "quantity": quantity,
+            "original_quantity": quantity,
+            "current_quantity": quantity,
+            "tier_1_sold": 0.0,
+            "tier_2_sold": 0.0,
+            "tier_1_executed": False,
+            "tier_2_executed": False,
+            "highest_price": price,
+            "trailing_stop_price": None,
             "timestamp": datetime.now(timezone.utc),
             "unrealized_pnl": 0.0
         }
@@ -113,16 +120,85 @@ class PositionTracker:
         print(f"🟢 OPENED POSITION: {pair} | Entry: ${price:.6f} | Qty: {quantity:.6f} | Value: ${trade_value:.2f}", flush=True)
         print(f"   💰 Cash: ${self.cash_balance:.2f} | Total Balance: ${total_balance:.2f} | Positions: {len(self.positions)}/{MAX_POSITIONS}", flush=True)
         return True
+    
+    def partial_close_position(self, pair, exit_price, percentage, tier_name, reason="PARTIAL_SELL"):
+        """Close a percentage of an existing position (for tiered exits)"""
+        if pair not in self.positions:
+            print(f"⚠️ No position to partially close for {pair}", flush=True)
+            return 0.0
+            
+        position = self.positions[pair]
+        entry_price = position["entry_price"]
+        current_quantity = position["current_quantity"]
+        
+        # Calculate quantity to sell (percentage of original position)
+        original_quantity = position["original_quantity"]
+        sell_quantity = original_quantity * percentage
+        
+        # Ensure we don't sell more than we have
+        if sell_quantity > current_quantity:
+            sell_quantity = current_quantity
+            
+        # Calculate sale proceeds
+        sale_proceeds = exit_price * sell_quantity
+        
+        # Calculate PnL for this partial sale
+        pnl_usd = (exit_price - entry_price) * sell_quantity
+        pnl_percent = ((exit_price - entry_price) / entry_price) * 100
+        
+        # Record trade
+        trade = {
+            "pair": pair,
+            "entry_price": entry_price,
+            "exit_price": exit_price,
+            "quantity": sell_quantity,
+            "pnl_usd": pnl_usd,
+            "pnl_percent": pnl_percent,
+            "reason": f"{reason} ({tier_name})",
+            "timestamp": datetime.now(timezone.utc),
+            "partial_exit": True,
+            "tier": tier_name
+        }
+        
+        self.trade_history.append(trade)
+        self.total_pnl += pnl_usd
+        
+        # Update position quantities
+        position["current_quantity"] -= sell_quantity
+        
+        # Mark tier as executed
+        if tier_name == "TIER_1":
+            position["tier_1_sold"] = sell_quantity
+            position["tier_1_executed"] = True
+        elif tier_name == "TIER_2":
+            position["tier_2_sold"] = sell_quantity
+            position["tier_2_executed"] = True
+        
+        # Update cash balance
+        self.cash_balance += sale_proceeds
+        
+        # Determine status emoji
+        profit_emoji = "📈" if pnl_usd >= 0 else "📉"
+        
+        print(f"🟡 PARTIAL CLOSE ({tier_name}): {pair} | Exit: ${exit_price:.6f} | Qty: {sell_quantity:.6f} | {profit_emoji} PnL: ${pnl_usd:.2f} ({pnl_percent:+.2f}%)", flush=True)
+        print(f"   💰 Cash: ${self.cash_balance:.2f} | Remaining: {position['current_quantity']:.6f} ({(position['current_quantity']/original_quantity)*100:.1f}% of original)", flush=True)
+        
+        # If position fully closed, remove it
+        if position["current_quantity"] <= 0.0001:  # Small threshold for floating point precision
+            del self.positions[pair]
+            print(f"   🔴 Position fully closed for {pair}", flush=True)
+            
+        return pnl_usd
         
     def close_position(self, pair, exit_price, reason="SELL"):
-        """Close an existing position and calculate PnL"""
+        """Close remaining position completely and calculate PnL"""
         if pair not in self.positions:
             print(f"⚠️ No position to close for {pair}", flush=True)
             return 0.0
             
         position = self.positions[pair]
         entry_price = position["entry_price"]
-        quantity = position["quantity"]
+        quantity = position["current_quantity"]  # Use remaining quantity
         
         # Calculate sale proceeds
         sale_proceeds = exit_price * quantity
@@ -162,13 +238,34 @@ class PositionTracker:
         return pnl_usd
         
     def update_unrealized_pnl(self, pair, current_price):
-        """Update unrealized PnL for open position"""
+        """Update unrealized PnL for open position and handle trailing stops"""
         if pair in self.positions:
             position = self.positions[pair]
             entry_price = position["entry_price"]
-            quantity = position["quantity"]
-            unrealized_pnl = (current_price - entry_price) * quantity
+            current_quantity = position["current_quantity"]
+            unrealized_pnl = (current_price - entry_price) * current_quantity
             position["unrealized_pnl"] = unrealized_pnl
+            
+            # Update highest price and trailing stop
+            self.update_highest_price_and_trailing_stop(pair, current_price)
+    
+    def update_highest_price_and_trailing_stop(self, pair, current_price):
+        """Update highest price and calculate trailing stop for tiered exits"""
+        if pair not in self.positions:
+            return
+            
+        position = self.positions[pair]
+        
+        # Update highest price if current price is higher
+        if current_price > position["highest_price"]:
+            position["highest_price"] = current_price
+            
+        # Calculate trailing stop (3% below highest price, but only after tier 2)
+        if position["tier_2_executed"]:
+            trailing_stop_percentage = 0.03  # 3% trailing stop
+            position["trailing_stop_price"] = position["highest_price"] * (1 - trailing_stop_percentage)
+        else:
+            position["trailing_stop_price"] = None
             
     def get_position_status(self, pair):
         """Get current position status"""
@@ -194,10 +291,17 @@ class PositionTracker:
         print(f"   📊 Total Return: {total_return:+.2f}%", flush=True)
         print(f"   📈 Realized PnL: ${self.total_pnl:.2f}", flush=True)
         
+        # Enhanced trade statistics
+        partial_trades = len([t for t in self.trade_history if t.get("partial_exit", False)])
+        full_trades = total_trades - partial_trades
+        tier_1_trades = len([t for t in self.trade_history if t.get("tier") == "TIER_1"])
+        tier_2_trades = len([t for t in self.trade_history if t.get("tier") == "TIER_2"])
+        
         print(f"\n📊 TRADING STATISTICS:", flush=True)
         print(f"   💼 Open Positions: {open_positions}/{MAX_POSITIONS}", flush=True)
-        print(f"   📈 Total Trades: {total_trades}", flush=True)
+        print(f"   📈 Total Trades: {total_trades} (Full: {full_trades}, Partial: {partial_trades})", flush=True)
         print(f"   🎯 Winning Trades: {winning_trades}/{total_trades}" + (f" ({winning_trades/total_trades*100:.1f}%)" if total_trades > 0 else ""), flush=True)
+        print(f"   🎯 Tiered Exits: T1: {tier_1_trades} | T2: {tier_2_trades}", flush=True)
         
         print(f"\n📊 RISK MANAGEMENT:", flush=True)
         print(f"   💰 Available Cash: ${self.cash_balance:.2f}", flush=True)
@@ -209,9 +313,19 @@ class PositionTracker:
             print(f"\n📋 OPEN POSITIONS:", flush=True)
             for pair, pos in self.positions.items():
                 unrealized = pos.get("unrealized_pnl", 0)
-                position_value = pos["entry_price"] * pos["quantity"]
+                position_value = pos["entry_price"] * pos["current_quantity"]
                 percentage = (position_value / total_balance) * 100
+                
+                # Tiered status
+                original_qty = pos["original_quantity"]
+                current_qty = pos["current_quantity"]
+                remaining_pct = (current_qty / original_qty) * 100
+                tier_1_status = "✅" if pos["tier_1_executed"] else "⏳"
+                tier_2_status = "✅" if pos["tier_2_executed"] else "⏳"
+                trailing_active = "🔄" if pos.get("trailing_stop_price") else "⏸️"
+                
                 print(f"      {pair}: ${pos['entry_price']:.6f} | Value: ${position_value:.2f} ({percentage:.1f}%) | Unrealized: ${unrealized:.2f}", flush=True)
+                print(f"         🎯 Tiers: T1 {tier_1_status} | T2 {tier_2_status} | Trail {trailing_active} | Remaining: {remaining_pct:.1f}% | Peak: ${pos['highest_price']:.6f}", flush=True)
 
 # === Signal Throttling Class ===
 class SignalThrottle:
@@ -412,6 +526,44 @@ def fetch_candles(pair):
         print(f"❌ Error fetching candles for {pair}: {e}", flush=True)
         raise
 
+# === Tiered Exit Strategy Logic ===
+def check_tiered_exits(position, current_price, tier_1_target, tier_2_target):
+    """
+    Check tiered exit conditions and return appropriate action
+    
+    Tier 1: Sell 30% at tier_1_target (e.g., +10%)
+    Tier 2: Sell 30% at tier_2_target (e.g., +20%) 
+    Tier 3: Keep 40% with trailing stop (3% below peak)
+    """
+    entry_price = position["entry_price"]
+    tier_1_executed = position["tier_1_executed"]
+    tier_2_executed = position["tier_2_executed"]
+    trailing_stop_price = position.get("trailing_stop_price")
+    
+    # Calculate target prices
+    tier_1_price = entry_price * tier_1_target
+    tier_2_price = entry_price * tier_2_target
+    
+    # Check Tier 1 exit (30% at +10%)
+    if not tier_1_executed and current_price >= tier_1_price:
+        return "SELL_TIER_1", f"Tier 1 target reached: ${current_price:.6f} >= ${tier_1_price:.6f} (+{((tier_1_target-1)*100):.0f}%) - Selling 30%"
+    
+    # Check Tier 2 exit (30% at +20%)
+    if tier_1_executed and not tier_2_executed and current_price >= tier_2_price:
+        return "SELL_TIER_2", f"Tier 2 target reached: ${current_price:.6f} >= ${tier_2_price:.6f} (+{((tier_2_target-1)*100):.0f}%) - Selling 30%"
+    
+    # Check Tier 3 trailing stop (remaining 40%)
+    if tier_2_executed and trailing_stop_price and current_price <= trailing_stop_price:
+        return "SELL_TIER_3", f"Trailing stop triggered: ${current_price:.6f} <= ${trailing_stop_price:.6f} - Selling remaining 40%"
+    
+    # No exit conditions met
+    if tier_2_executed:
+        return "HOLD", f"Trailing stop active at ${trailing_stop_price:.6f}" if trailing_stop_price else "Waiting for trailing stop setup"
+    elif tier_1_executed:
+        return "HOLD", f"Waiting for Tier 2 at ${tier_2_price:.6f} (+{((tier_2_target-1)*100):.0f}%)"
+    else:
+        return "HOLD", f"Waiting for Tier 1 at ${tier_1_price:.6f} (+{((tier_1_target-1)*100):.0f}%)"
+
 # === Analyze and execute trading strategy ===
 def analyze_and_trade(pair, candles):
     """Analyze candles and execute trading logic with enhanced filters"""
@@ -465,33 +617,43 @@ def analyze_and_trade(pair, candles):
             unrealized = current_position["unrealized_pnl"]
             entry_price = current_position["entry_price"]
             
-            # Enhanced sell logic
+            # Get tiered exit configuration
+            tier_1_target = config.get("tier_1_target", config["take_profit_1"])
+            tier_2_target = config.get("tier_2_target", config["take_profit_2"])
+            
+            # Priority 1: Check ATR-based stop loss (emergency exit)
             should_sell_enhanced, sell_action, sell_reason = enhanced_should_sell(candles, current_price, entry_price)
             
             if should_sell_enhanced:
-                action = sell_action
-                reason = sell_reason
+                action = "SELL_ALL"
+                reason = f"Emergency exit: {sell_reason}"
             else:
-                # Check traditional take profit levels
-                if current_price >= take_profit_2:
-                    action = "SELL (TP2)"
-                    reason = f"Take profit 2 reached: ${current_price:.6f} >= ${take_profit_2:.6f}"
-                elif current_price >= take_profit_1:
-                    action = "SELL (TP1)" 
-                    reason = f"Take profit 1 reached: ${current_price:.6f} >= ${take_profit_1:.6f}"
-                else:
-                    action = "HOLD"
-                    reason = sell_reason
+                # Priority 2: Tiered Exit Strategy
+                action, reason = check_tiered_exits(current_position, current_price, tier_1_target, tier_2_target)
+                
+            # Show position status with tiered information
+            original_qty = current_position["original_quantity"]
+            current_qty = current_position["current_quantity"]
+            remaining_pct = (current_qty / original_qty) * 100
+            tier_1_status = "✅" if current_position["tier_1_executed"] else "⏳"
+            tier_2_status = "✅" if current_position["tier_2_executed"] else "⏳"
+            trailing_active = "🔄" if current_position.get("trailing_stop_price") else "⏸️"
                     
             # Show position status
             pnl_percent = ((current_price - entry_price) / entry_price) * 100
             pnl_emoji = "📈" if unrealized >= 0 else "📉"
             
-            # Show ATR stop loss level
+            # Show comprehensive position status
             atr_stop = get_atr_stop_loss(candles, entry_price)
-            stop_info = f" | ATR Stop: ${atr_stop:.6f}" if atr_stop else ""
+            highest_price = current_position["highest_price"]
+            trailing_stop = current_position.get("trailing_stop_price")
             
-            print(f"   💼 Position: Entry ${entry_price:.6f} | {pnl_emoji} Unrealized: ${unrealized:.2f} ({pnl_percent:+.2f}%){stop_info}", flush=True)
+            print(f"   💼 Position: Entry ${entry_price:.6f} | {pnl_emoji} Unrealized: ${unrealized:.2f} ({pnl_percent:+.2f}%) | Remaining: {remaining_pct:.1f}%", flush=True)
+            print(f"   📊 Tiers: T1 {tier_1_status} | T2 {tier_2_status} | Trail {trailing_active} | Peak: ${highest_price:.6f}", flush=True)
+            if trailing_stop:
+                print(f"   🛡️ Trailing Stop: ${trailing_stop:.6f} | ATR Stop: ${atr_stop:.6f}" if atr_stop else f"   🛡️ Trailing Stop: ${trailing_stop:.6f}", flush=True)
+            elif atr_stop:
+                print(f"   🛡️ ATR Stop: ${atr_stop:.6f}", flush=True)
         
         print(f"📊 {pair}: ${current_price:.6f} | Action: {action}", flush=True)
         print(f"   🔍 Reason: {reason}", flush=True)
@@ -518,8 +680,23 @@ def analyze_and_trade(pair, candles):
                 if success:
                     print(f"🧪 SIMULATION - BUY executed for {pair} at ${current_price:.6f}", flush=True)
             elif action.startswith("SELL"):
-                pnl = position_tracker.close_position(pair, current_price, reason=action)
-                print(f"🧪 SIMULATION - {action} executed for {pair} at ${current_price:.6f}", flush=True)
+                # Handle different sell types in simulation
+                if action == "SELL_TIER_1":
+                    pnl = position_tracker.partial_close_position(pair, current_price, 0.30, "TIER_1", reason="TIER_1_PROFIT")
+                    print(f"🧪 SIMULATION - TIER 1 exit executed (30%) for {pair} at ${current_price:.6f}", flush=True)
+                elif action == "SELL_TIER_2":
+                    pnl = position_tracker.partial_close_position(pair, current_price, 0.30, "TIER_2", reason="TIER_2_PROFIT")
+                    print(f"🧪 SIMULATION - TIER 2 exit executed (30%) for {pair} at ${current_price:.6f}", flush=True)
+                elif action == "SELL_TIER_3":
+                    pnl = position_tracker.close_position(pair, current_price, reason="TIER_3_TRAILING")
+                    print(f"🧪 SIMULATION - TIER 3 trailing exit executed (remaining) for {pair} at ${current_price:.6f}", flush=True)
+                elif action == "SELL_ALL":
+                    pnl = position_tracker.close_position(pair, current_price, reason=action)
+                    print(f"🧪 SIMULATION - Emergency exit executed (100%) for {pair} at ${current_price:.6f}", flush=True)
+                else:
+                    # Fallback for legacy sell actions
+                    pnl = position_tracker.close_position(pair, current_price, reason=action)
+                    print(f"🧪 SIMULATION - {action} executed for {pair} at ${current_price:.6f}", flush=True)
         else:
             # Real trading execution
             if action == "BUY":
@@ -563,14 +740,36 @@ def analyze_and_trade(pair, candles):
                 try:
                     current_position = position_tracker.get_position_status(pair)
                     if current_position:
-                        quantity = current_position["quantity"]
+                        # Calculate quantity based on sell type
+                        if action == "SELL_TIER_1":
+                            # Sell 30% of original position
+                            quantity = current_position["original_quantity"] * 0.30
+                            print(f"📊 TIER 1 EXIT - Selling 30% of original position: {quantity:.6f}", flush=True)
+                        elif action == "SELL_TIER_2":
+                            # Sell 30% of original position
+                            quantity = current_position["original_quantity"] * 0.30
+                            print(f"📊 TIER 2 EXIT - Selling 30% of original position: {quantity:.6f}", flush=True)
+                        else:
+                            # Sell all remaining (SELL_TIER_3, SELL_ALL, or legacy)
+                            quantity = current_position["current_quantity"]
+                            print(f"📊 FULL EXIT - Selling remaining position: {quantity:.6f}", flush=True)
+                        
+                        # Execute the sell order
                         order_result = client.market_order_sell(
                             client_order_id=f"sell_{pair}_{int(datetime.now().timestamp())}",
                             product_id=pair,
                             base_size=str(quantity)
                         )
                         print(f"✅ SELL ORDER PLACED: {order_result.order_id}", flush=True)
-                        position_tracker.close_position(pair, current_price, reason=action)
+                        
+                        # Update position tracker
+                        if action == "SELL_TIER_1":
+                            position_tracker.partial_close_position(pair, current_price, 0.30, "TIER_1", reason="TIER_1_PROFIT")
+                        elif action == "SELL_TIER_2":
+                            position_tracker.partial_close_position(pair, current_price, 0.30, "TIER_2", reason="TIER_2_PROFIT")
+                        else:
+                            position_tracker.close_position(pair, current_price, reason=action)
+                            
                     else:
                         print(f"⚠️ No position to sell for {pair}", flush=True)
                         

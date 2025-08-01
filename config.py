@@ -1,5 +1,11 @@
 CONFIG = {
     "DEFAULT": {
+        # Tiered Exit Strategy
+        "tier_1_target": 1.10,     # 10% - Sell 30% of position
+        "tier_2_target": 1.20,     # 20% - Sell 30% of position  
+        "tier_3_trailing": 0.03,   # 3% trailing stop for remaining 40%
+        
+        # Legacy targets (kept for compatibility)
         "take_profit_1": 1.08,     # 8% profit target 1 (conservative)
         "take_profit_2": 1.20,     # 20% profit target 2 (aggressive)
         "rebuy_zone": 999999,      # No price limit - rely on technical filters
@@ -37,18 +43,36 @@ CONFIG = {
     },
     # Major Tier-1 Cryptocurrencies
     "BTC-USD": {
+        # Tiered Exit Strategy
+        "tier_1_target": 1.08,     # 8% - Sell 30% (conservative for BTC)
+        "tier_2_target": 1.15,     # 15% - Sell 30%
+        "tier_3_trailing": 0.03,   # 3% trailing stop for remaining 40%
+        
+        # Legacy targets
         "take_profit_1": 1.08,     # 8% profit (conservative for BTC)
         "take_profit_2": 1.15,     # 15% profit target
         "rebuy_zone": 999999,      # No price limit - use technical filters
         "stop_loss_pct": 0.05
     },
     "ETH-USD": {
+        # Tiered Exit Strategy
+        "tier_1_target": 1.10,     # 10% - Sell 30%
+        "tier_2_target": 1.20,     # 20% - Sell 30%
+        "tier_3_trailing": 0.03,   # 3% trailing stop for remaining 40%
+        
+        # Legacy targets
         "take_profit_1": 1.10,     # 10% profit target
         "take_profit_2": 1.20,     # 20% profit target
         "rebuy_zone": 999999,      # No price limit - use technical filters  
         "stop_loss_pct": 0.05
     },
     "SOL-USD": {
+        # Tiered Exit Strategy
+        "tier_1_target": 1.12,     # 12% - Sell 30%
+        "tier_2_target": 1.25,     # 25% - Sell 30%
+        "tier_3_trailing": 0.03,   # 3% trailing stop for remaining 40%
+        
+        # Legacy targets
         "take_profit_1": 1.12,     # 12% profit target
         "take_profit_2": 1.25,     # 25% profit target
         "rebuy_zone": 999999,      # No price limit - use technical filters
