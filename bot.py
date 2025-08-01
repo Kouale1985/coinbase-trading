@@ -330,6 +330,22 @@ if not SIMULATION:
 else:
     print("✅ Safe mode: Only analyzing signals, no real trades", flush=True)
 
+def fetch_current_price(pair):
+    """Fetch real-time current price for more accurate analysis"""
+    try:
+        # Get current market data (real-time ticker)
+        ticker = client.get_product(product_id=pair)
+        if hasattr(ticker, 'price'):
+            return float(ticker.price)
+        elif hasattr(ticker, 'quote_increment'):
+            # Fallback: use latest trade data
+            trades = client.get_public_trades(product_id=pair, limit=1)
+            if trades and len(trades.trades) > 0:
+                return float(trades.trades[0].price)
+    except Exception as e:
+        print(f"⚠️ Error fetching current price for {pair}: {e}", flush=True)
+    return None
+
 # === Fetch candle data ===
 def fetch_candles(pair):
     """Fetch candle data for the specified pair"""
@@ -365,7 +381,12 @@ def analyze_and_trade(pair, candles):
         else:
             candle_data = candles
             
-        current_price = float(candle_data[-1].close)
+        # Use real-time price if available, fallback to candle close
+        real_time_price = fetch_current_price(pair)
+        current_price = real_time_price if real_time_price else float(candle_data[-1].close)
+        
+        if real_time_price:
+            print(f"💰 Using real-time price: ${current_price:.6f} (vs candle close: ${float(candle_data[-1].close):.6f})", flush=True)
         
         # Get current position
         current_position = position_tracker.get_position_status(pair)
@@ -510,7 +531,9 @@ async def run_bot():
             # Collect signal data for dashboard
             if candles and hasattr(candles, 'candles') and candles.candles:
                 candle_data = candles.candles
-                current_price = float(candle_data[-1].close)
+                # Use real-time price for dashboard data too
+                real_time_price = fetch_current_price(pair)
+                current_price = real_time_price if real_time_price else float(candle_data[-1].close)
                 
                 # Get technical indicators
                 indicators = calculate_all_indicators(candle_data)

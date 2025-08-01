@@ -58,8 +58,8 @@ SIGNAL_THROTTLE_MINUTES = 15        # 15-minute throttle between signals per pai
 
 # === API Configuration ===
 
-GRANULARITY = "FIVE_MINUTE"         # Candle data granularity
-LOOP_SECONDS_DEFAULT = 120          # Default bot loop interval in seconds
+GRANULARITY = "ONE_MINUTE"          # Candle data granularity (reduced lag)
+LOOP_SECONDS_DEFAULT = 60           # Bot loop interval in seconds (faster updates)
 CANDLE_FETCH_MINUTES = 1000         # Fetch 1000 minutes of data for proper RSI initialization
 
 # === Trading Pairs ===
