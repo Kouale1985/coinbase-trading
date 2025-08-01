@@ -20,20 +20,33 @@ def ensure_data_directory():
     if not os.path.exists('data'):
         os.makedirs('data')
 
-def export_portfolio_data(position_tracker):
+def export_portfolio_data(position_tracker, current_prices=None):
     """Export portfolio summary data with encoding"""
+    # Calculate position values using current prices if available
+    if current_prices:
+        position_value = sum(
+            current_prices.get(pair, pos["entry_price"]) * pos["quantity"] 
+            for pair, pos in position_tracker.positions.items()
+        )
+        total_balance = position_tracker.calculate_total_balance(current_prices)
+    else:
+        position_value = sum(
+            pos["entry_price"] * pos["quantity"] for pos in position_tracker.positions.values()
+        )
+        total_balance = position_tracker.calculate_total_balance()
+    
     portfolio_data = {
         "starting_balance": STARTING_BALANCE_USD,
         "current_cash": position_tracker.cash_balance,
-        "position_value": sum(pos.position_value for pos in position_tracker.positions.values()),
-        "total_balance": position_tracker.calculate_total_balance(),
-        "total_return_pct": ((position_tracker.calculate_total_balance() - STARTING_BALANCE_USD) / STARTING_BALANCE_USD) * 100,
+        "position_value": position_value,
+        "total_balance": total_balance,
+        "total_return_pct": ((total_balance - STARTING_BALANCE_USD) / STARTING_BALANCE_USD) * 100,
         "realized_pnl": position_tracker.total_pnl,
         "open_positions": len(position_tracker.positions),
         "max_positions": MAX_POSITIONS,
         "total_trades": len(position_tracker.trade_history),
         "winning_trades": len([t for t in position_tracker.trade_history if t.get('pnl', 0) > 0]),
-        "portfolio_exposure": (sum(pos.position_value for pos in position_tracker.positions.values()) / position_tracker.calculate_total_balance()) * 100,
+        "portfolio_exposure": (position_value / total_balance) * 100 if total_balance > 0 else 0,
         "max_exposure": MAX_EXPOSURE * 100,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
@@ -51,19 +64,26 @@ def export_portfolio_data(position_tracker):
     except Exception as e:
         print(f"⚠️ Error exporting portfolio data: {e}", flush=True)
 
-def export_positions_data(position_tracker):
+def export_positions_data(position_tracker, current_prices=None):
     """Export current positions for dashboard"""
     ensure_data_directory()
     
     positions_data = []
     for pair, position in position_tracker.positions.items():
+        entry_value = position["entry_price"] * position["quantity"]
+        current_price = current_prices.get(pair, position["entry_price"]) if current_prices else position["entry_price"]
+        position_value = current_price * position["quantity"]
+        unrealized_pnl = position_value - entry_value
+        
         positions_data.append({
             "pair": pair,
             "entry_price": position["entry_price"],
+            "current_price": current_price,
             "quantity": position["quantity"],
-            "entry_value": position["entry_value"],
-            "unrealized_pnl": position.get("unrealized_pnl", 0),
-            "entry_time": position["entry_time"]
+            "entry_value": entry_value,
+            "position_value": position_value,
+            "unrealized_pnl": unrealized_pnl,
+            "entry_time": position.get("timestamp", position.get("entry_time", ""))
         })
     
     with open('data/positions.json', 'w') as f:
@@ -164,15 +184,26 @@ MIN_TRADE_SIZE = 50                 # Don't enter trades smaller than this
 RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
 
 # TODO: Add real account balance query
-# def get_real_account_balance():
-#     """Query actual USD balance from Coinbase account"""
-#     try:
-#         accounts = client.get_accounts()
-#         for account in accounts.accounts:
-#             if account.currency == "USD":
-#                 return float(account.available_balance.value)
-#     except Exception:
-#         return STARTING_BALANCE_USD
+def get_real_account_balance():
+    """Query actual USD balance from Coinbase account"""
+    try:
+        accounts = client.get_accounts()
+        if hasattr(accounts, 'accounts'):
+            for account in accounts.accounts:
+                if account.currency == "USD":
+                    return float(account.available_balance.value)
+        else:
+            # Handle different response format
+            for account in accounts:
+                if account.get('currency') == "USD":
+                    return float(account.get('available_balance', {}).get('value', 0))
+        
+        print("⚠️ USD account not found, using default balance", flush=True)
+        return STARTING_BALANCE_USD
+    except Exception as e:
+        print(f"⚠️ Error fetching real account balance: {e}", flush=True)
+        print("📊 Using configured starting balance instead", flush=True)
+        return STARTING_BALANCE_USD
 
 # === Position Tracking Class with Portfolio Management ===
 class PositionTracker:
@@ -183,11 +214,19 @@ class PositionTracker:
         self.cash_balance = STARTING_BALANCE_USD
         self.starting_balance = STARTING_BALANCE_USD
         
-    def calculate_total_balance(self):
+    def calculate_total_balance(self, current_prices=None):
         """Calculate total portfolio value (cash + positions)"""
-        position_value = sum(
-            pos["entry_price"] * pos["quantity"] for pos in self.positions.values()
-        )
+        if current_prices is None:
+            # Fallback to entry prices if current prices not provided
+            position_value = sum(
+                pos["entry_price"] * pos["quantity"] for pos in self.positions.values()
+            )
+        else:
+            # Use current market prices for accurate portfolio value
+            position_value = sum(
+                current_prices.get(pair, pos["entry_price"]) * pos["quantity"] 
+                for pair, pos in self.positions.items()
+            )
         return self.cash_balance + position_value
         
     def calculate_position_size(self, price, atr_value=None):
@@ -245,6 +284,8 @@ class PositionTracker:
         self.positions[pair] = {
             "entry_price": price,
             "quantity": quantity,
+            "entry_value": trade_value,
+            "position_value": trade_value,  # Will be updated with current prices
             "timestamp": datetime.now(timezone.utc),
             "unrealized_pnl": 0.0
         }
@@ -305,12 +346,15 @@ class PositionTracker:
         return pnl_usd
         
     def update_unrealized_pnl(self, pair, current_price):
-        """Update unrealized PnL for open position"""
+        """Update unrealized PnL and position value for open position"""
         if pair in self.positions:
             position = self.positions[pair]
             entry_price = position["entry_price"]
             quantity = position["quantity"]
+            position_value = current_price * quantity
             unrealized_pnl = (current_price - entry_price) * quantity
+            
+            position["position_value"] = position_value
             position["unrealized_pnl"] = unrealized_pnl
             
     def get_position_status(self, pair):
@@ -777,8 +821,11 @@ async def run_bot():
     
     # Export all data for dashboard
     try:
-        export_portfolio_data(position_tracker)
-        export_positions_data(position_tracker)
+        # Collect current prices for accurate portfolio valuation
+        current_prices = {signal["pair"]: signal["price"] for signal in signals_data}
+        
+        export_portfolio_data(position_tracker, current_prices)
+        export_positions_data(position_tracker, current_prices)
         export_signals_data(signals_data)
         export_trade_history(position_tracker)
         commit_data_to_github()
