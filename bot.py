@@ -13,7 +13,6 @@ from strategy import should_buy, should_sell, enhanced_should_buy, enhanced_shou
 from config import CONFIG
 
 # === Core Trading Functions ===
-TRADING_PAIRS = ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
 
 # === Professional Portfolio Management Constants ===
 STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
@@ -753,17 +752,9 @@ except Exception as test_error:
 # === Config ===
 GRANULARITY = "FIVE_MINUTE"  # Changed from ONE_MINUTE for better signal quality with multi-filter strategy
 
-# Tier-1 High-Volume Cryptocurrency Pairs (Liquid, Less Manipulation Risk)
-TIER_1_PAIRS = [
-    "BTC-USD", "ETH-USD", "XRP-USD", "ADA-USD", "SOL-USD",
-    "DOGE-USD", "DOT-USD", "AVAX-USD", "MATIC-USD", "LINK-USD",
-    "UNI-USD", "LTC-USD", "ATOM-USD", "XLM-USD", "ALGO-USD",
-    "VET-USD", "ICP-USD", "FIL-USD", "ETC-USD",  # Removed TRX-USD
-    "OP-USD", "ARB-USD"  # Keep your current pairs
-]
-
-# Allow environment override or use tier-1 default
-TRADING_PAIRS = os.getenv("TRADE_PAIRS", ",".join(TIER_1_PAIRS)).split(",")
+# Focused core pairs (override environment to prevent spam)
+FOCUSED_PAIRS = ["BTC-USD", "ETH-USD", "XRP-USD", "ARB-USD", "OP-USD", "LINK-USD", "SOL-USD", "ADA-USD"]
+TRADING_PAIRS = os.getenv("TRADE_PAIRS", ",".join(FOCUSED_PAIRS)).split(",")
 
 LOOP_SECONDS = int(os.getenv("TRADE_LOOP_SECONDS", "120"))
 SIMULATION = os.getenv("SIMULATION", "true").lower() == "true"
@@ -1041,7 +1032,16 @@ def analyze_and_trade(pair, candles):
                             product_id=pair,
                             quote_size=str(trade_value)
                         )
-                        print(f"✅ BUY ORDER PLACED: {order_result.order_id}", flush=True)
+                        # Handle different API response formats
+                        order_id = None
+                        if hasattr(order_result, 'order_id'):
+                            order_id = order_result.order_id
+                        elif hasattr(order_result, 'id'):
+                            order_id = order_result.id
+                        elif isinstance(order_result, dict):
+                            order_id = order_result.get('order_id') or order_result.get('id')
+                        
+                        print(f"✅ BUY ORDER PLACED: {order_id if order_id else 'Order ID not found'}", flush=True)
                         position_tracker.open_position(pair, current_price, current_atr)
                         
                         # Immediate balance sync after trade execution
@@ -1076,7 +1076,16 @@ def analyze_and_trade(pair, candles):
                             product_id=pair,
                             base_size=str(quantity)
                         )
-                        print(f"✅ SELL ORDER PLACED: {order_result.order_id}", flush=True)
+                        # Handle different API response formats
+                        order_id = None
+                        if hasattr(order_result, 'order_id'):
+                            order_id = order_result.order_id
+                        elif hasattr(order_result, 'id'):
+                            order_id = order_result.id
+                        elif isinstance(order_result, dict):
+                            order_id = order_result.get('order_id') or order_result.get('id')
+                        
+                        print(f"✅ SELL ORDER PLACED: {order_id if order_id else 'Order ID not found'}", flush=True)
                         
                         # Update position tracker
                         if action == "SELL_TIER_1":
