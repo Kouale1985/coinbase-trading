@@ -1,9 +1,12 @@
+# Legacy config.py - Now using dynamic ATR-based targets instead of static configs
+# This file is kept for backward compatibility but is no longer actively used
+
 CONFIG = {
     "DEFAULT": {
-        "take_profit_1": 1.08,     # 8% profit target 1 (conservative)
-        "take_profit_2": 1.20,     # 20% profit target 2 (aggressive)
-        "rebuy_zone": 999999,      # No price limit - rely on technical filters
-        "stop_loss_pct": 0.05      # 5% stop loss (overridden by ATR stops)
+        "take_profit_1": 1.08,     # 8% profit target 1 (conservative) - DEPRECATED
+        "take_profit_2": 1.20,     # 20% profit target 2 (aggressive) - DEPRECATED  
+        "rebuy_zone": 999999,      # No price limit - rely on technical filters - DEPRECATED
+        "stop_loss_pct": 0.05      # 5% stop loss (overridden by ATR stops) - DEPRECATED
     },
     "XLM-USD": {
         "take_profit_1": 0.46,
