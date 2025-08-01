@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+import csv
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
@@ -116,6 +117,20 @@ class PositionTracker:
         # Update cash balance
         self.cash_balance -= trade_value
         
+        # Record BUY trade
+        buy_trade = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pair": pair,
+            "action": "BUY",
+            "entry_price": price,
+            "exit_price": "",  # Empty for buy trades
+            "quantity": quantity,
+            "pnl_usd": "",  # Empty for buy trades
+            "pnl_percent": "",  # Empty for buy trades
+            "strategy_reason": f"Position opened with {reason}" if 'reason' in locals() else "Position opened"
+        }
+        self.trade_history.append(buy_trade)
+        
         total_balance = self.calculate_total_balance()
         print(f"🟢 OPENED POSITION: {pair} | Entry: ${price:.6f} | Qty: {quantity:.6f} | Value: ${trade_value:.2f}", flush=True)
         print(f"   💰 Cash: ${self.cash_balance:.2f} | Total Balance: ${total_balance:.2f} | Positions: {len(self.positions)}/{MAX_POSITIONS}", flush=True)
@@ -148,16 +163,15 @@ class PositionTracker:
         
         # Record trade
         trade = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "pair": pair,
+            "action": f"{reason}_{tier_name}",
             "entry_price": entry_price,
             "exit_price": exit_price,
             "quantity": sell_quantity,
             "pnl_usd": pnl_usd,
             "pnl_percent": pnl_percent,
-            "reason": f"{reason} ({tier_name})",
-            "timestamp": datetime.now(timezone.utc),
-            "partial_exit": True,
-            "tier": tier_name
+            "strategy_reason": f"{reason} ({tier_name})"
         }
         
         self.trade_history.append(trade)
@@ -209,14 +223,15 @@ class PositionTracker:
         
         # Record trade
         trade = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "pair": pair,
+            "action": reason,
             "entry_price": entry_price,
             "exit_price": exit_price,
             "quantity": quantity,
             "pnl_usd": pnl_usd,
             "pnl_percent": pnl_percent,
-            "reason": reason,
-            "timestamp": datetime.now(timezone.utc)
+            "strategy_reason": reason
         }
         
         self.trade_history.append(trade)
@@ -361,6 +376,43 @@ class SignalThrottle:
         else:
             minutes_remaining = int(time_remaining / 60)
             return f"⏳ {minutes_remaining}m remaining"
+
+# === Real-time Price Function ===
+def get_real_time_price(pair):
+    """Get real-time price using get_product_ticker instead of stale candle data"""
+    try:
+        ticker = client.get_product_ticker(product_id=pair)
+        return float(ticker.price)
+    except Exception as e:
+        print(f"⚠️ Failed to get real-time price for {pair}: {e}", flush=True)
+        return None
+
+# === CSV Export Function ===
+def export_trade_history_to_csv(trades, filename="trade_history.csv"):
+    """Export trade history to CSV file for analysis"""
+    if not trades:
+        print("📊 No trades to export", flush=True)
+        return
+    
+    # Define CSV fieldnames with proper order
+    fieldnames = [
+        "timestamp", "pair", "action", "entry_price", "exit_price", 
+        "quantity", "pnl_usd", "pnl_percent", "strategy_reason"
+    ]
+    
+    try:
+        with open(filename, 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            # Write each trade, ensuring all fields are present
+            for trade in trades:
+                row = {field: trade.get(field, '') for field in fieldnames}
+                writer.writerow(row)
+        
+        print(f"📊 Exported {len(trades)} trades to {filename}", flush=True)
+    except Exception as e:
+        print(f"❌ Error exporting trades to CSV: {e}", flush=True)
 
 # Initialize position tracker and signal throttle
 position_tracker = PositionTracker()
@@ -580,7 +632,15 @@ def analyze_and_trade(pair, candles):
         else:
             candle_data = candles
             
-        current_price = float(candle_data[-1].close)
+        # Get real-time price (more accurate than stale candle data)
+        real_time_price = get_real_time_price(pair)
+        if real_time_price is not None:
+            current_price = real_time_price
+            # Update the last candle close with real-time price for RSI calculation
+            candle_data[-1].close = str(current_price)
+        else:
+            # Fallback to candle close price if real-time fetch fails
+            current_price = float(candle_data[-1].close)
         
         # Get current position
         current_position = position_tracker.get_position_status(pair)
@@ -792,7 +852,17 @@ async def run_bot():
             # Collect signal data for dashboard
             if candles and hasattr(candles, 'candles') and candles.candles:
                 candle_data = candles.candles
-                current_price = float(candle_data[-1].close)
+                
+                # Get real-time price (more accurate than stale candle data)
+                real_time_price = get_real_time_price(pair)
+                if real_time_price is not None:
+                    current_price = real_time_price
+                    # Update the last candle close with real-time price for RSI calculation
+                    candle_data[-1].close = str(current_price)
+                else:
+                    # Fallback to candle close price if real-time fetch fails
+                    current_price = float(candle_data[-1].close)
+                
                 config = CONFIG.get(pair, CONFIG["DEFAULT"])
                 
                 # Get technical indicators
@@ -800,7 +870,7 @@ async def run_bot():
                 highs = [float(c.high) for c in candle_data]
                 lows = [float(c.low) for c in candle_data]
                 
-                current_rsi = rsi(closes, exclude_current=True)
+                current_rsi = rsi(closes)
                 ema_50 = ema(closes, 50)
                 macd_line, signal_line, _ = macd(closes)
                 current_atr = atr(highs, lows, closes)
@@ -840,6 +910,9 @@ async def run_bot():
     #     commit_data_to_github()
     # except Exception as e:
     #     print(f"⚠️ Error exporting dashboard data: {e}", flush=True)
+    
+    # Export trade history to CSV
+    export_trade_history_to_csv(position_tracker.trade_history)
     
     # Print trading summary after analyzing all pairs
     position_tracker.print_summary()
