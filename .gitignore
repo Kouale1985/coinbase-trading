@@ -1,5 +1,5 @@
-# Data directory removed from .gitignore to enable dashboard sync
-# data/
+# Data directory - bot runtime data, no need to track
+data/
 
 # Environment variables
 .env

@@ -4,172 +4,12 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
-from io import StringIO
-import base64
-
-import subprocess
-import tempfile
 
 from coinbase.rest import RESTClient
 from strategy import should_buy, should_sell, rsi, enhanced_should_buy, enhanced_should_sell, get_atr_stop_loss, ema, macd, atr
 from config import CONFIG
 
-# === Dashboard Data Export Functions ===
-def ensure_data_directory():
-    """Ensure data directory exists for dashboard exports"""
-    if not os.path.exists('data'):
-        os.makedirs('data')
-
-def export_portfolio_data(position_tracker):
-    """Export portfolio summary data with encoding"""
-    portfolio_data = {
-        "starting_balance": STARTING_BALANCE_USD,
-        "current_cash": position_tracker.cash_balance,
-        "position_value": sum(pos.position_value for pos in position_tracker.positions.values()),
-        "total_balance": position_tracker.calculate_total_balance(),
-        "total_return_pct": ((position_tracker.calculate_total_balance() - STARTING_BALANCE_USD) / STARTING_BALANCE_USD) * 100,
-        "realized_pnl": position_tracker.total_pnl,
-        "open_positions": len(position_tracker.positions),
-        "max_positions": MAX_POSITIONS,
-        "total_trades": len(position_tracker.trade_history),
-        "winning_trades": len([t for t in position_tracker.trade_history if t.get('pnl', 0) > 0]),
-        "portfolio_exposure": (sum(pos.position_value for pos in position_tracker.positions.values()) / position_tracker.calculate_total_balance()) * 100,
-        "max_exposure": MAX_EXPOSURE * 100,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    try:
-        ensure_data_directory()
-        # Encode the data
-        json_str = json.dumps(portfolio_data, indent=2)
-        encoded_data = base64.b64encode(json_str.encode()).decode()
-        
-        # Use obscure filename
-        with open('data/p_data.json', 'w') as f:
-            json.dump(portfolio_data, f, indent=2)
-        print(f"📊 Portfolio data exported and encoded", flush=True)
-    except Exception as e:
-        print(f"⚠️ Error exporting portfolio data: {e}", flush=True)
-
-def export_positions_data(position_tracker):
-    """Export current positions for dashboard"""
-    ensure_data_directory()
-    
-    positions_data = []
-    for pair, position in position_tracker.positions.items():
-        positions_data.append({
-            "pair": pair,
-            "entry_price": position["entry_price"],
-            "quantity": position["quantity"],
-            "entry_value": position["entry_value"],
-            "unrealized_pnl": position.get("unrealized_pnl", 0),
-            "entry_time": position["entry_time"]
-        })
-    
-    with open('data/positions.json', 'w') as f:
-        json.dump(positions_data, f, indent=2)
-
-def export_signals_data(signals_data):
-    """Export current market signals for dashboard"""
-    ensure_data_directory()
-    
-    # Handle potential datetime serialization issues
-    try:
-        with open('data/signals.json', 'w') as f:
-            json.dump(signals_data, f, indent=2, default=str)
-    except Exception as e:
-        print(f"⚠️ Error exporting signals data: {e}", flush=True)
-        # Try with datetime conversion fallback
-        cleaned_signals = []
-        for signal in signals_data:
-            cleaned_signal = {}
-            for key, value in signal.items():
-                if hasattr(value, 'isoformat'):
-                    cleaned_signal[key] = value.isoformat()
-                else:
-                    cleaned_signal[key] = value
-            cleaned_signals.append(cleaned_signal)
-        
-        with open('data/signals.json', 'w') as f:
-            json.dump(cleaned_signals, f, indent=2)
-
-def export_trade_history(position_tracker):
-    """Export trade history for dashboard"""
-    ensure_data_directory()
-    
-    with open('data/trade_history.json', 'w') as f:
-        json.dump(position_tracker.trade_history, f, indent=2)
-
-def commit_data_to_github():
-    """
-    Commit the exported data files to GitHub
-    This allows Streamlit to read the data from GitHub raw URLs
-    """
-    try:
-        # Configure git if not already done
-        subprocess.run(['git', 'config', 'user.email', 'bot@tradingbot.com'], 
-                      capture_output=True, text=True, check=False)
-        subprocess.run(['git', 'config', 'user.name', 'Trading Bot'], 
-                      capture_output=True, text=True, check=False)
-        
-        # Configure git remote with token for pushing
-        github_token = os.getenv('GITHUB_TOKEN')
-        if github_token:
-            # Set up remote origin with authentication
-            remote_url = f"https://{github_token}@github.com/Kouale1985/dashboard.git"
-            
-            # Remove existing origin if it exists, then add new one
-            subprocess.run(['git', 'remote', 'remove', 'origin'], 
-                          capture_output=True, text=True, check=False)
-            subprocess.run(['git', 'remote', 'add', 'origin', remote_url], 
-                          capture_output=True, text=True, check=False)
-            
-            # Ensure we're on main branch and sync with remote
-            subprocess.run(['git', 'checkout', '-B', 'main'], 
-                          capture_output=True, text=True, check=False)
-            # Skip fetch to avoid conflicts - force push will override remote
-            print("📤 Configured for force push to override remote conflicts")
-            print(f"🔧 Git remote configured with GitHub token")
-        
-        # Add the data files (create directory first if needed)
-        if os.path.exists('data'):
-            subprocess.run(['git', 'add', 'data/'], capture_output=True, text=True, check=True)
-        else:
-            print("📁 Data directory doesn't exist yet, skipping git add")
-        
-        # Create commit message with timestamp
-        now = datetime.now(timezone.utc)
-        commit_msg = f"🤖 Bot data update: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}"
-        
-        # Commit the changes
-        result = subprocess.run(['git', 'commit', '-m', commit_msg], 
-                              capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            # Push to GitHub (force push to resolve conflicts)
-            push_result = subprocess.run(['git', 'push', '--force', 'origin', 'main'], capture_output=True, text=True)
-            if push_result.returncode == 0:
-                print(f"✅ Data successfully committed and pushed to GitHub")
-                return True
-            else:
-                print(f"⚠️ Git push failed: {push_result.stderr}")
-                print(f"📊 Continuing with local data export (dashboard will use cached data)")
-                return False
-        else:
-            # No changes to commit (data unchanged)
-            if "nothing to commit" in result.stdout:
-                print("📊 No data changes since last commit")
-                return True
-            else:
-                print(f"⚠️ Git commit failed: {result.stderr}")
-                return False
-                
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Git operation failed: {e}")
-        return False
-    except Exception as e:
-        print(f"❌ Error in GitHub sync: {e}")
-        return False
+# === Core Trading Functions ===
 
 # === Professional Portfolio Management Constants ===
 STARTING_BALANCE_USD = 1000  # UPDATE THIS TO YOUR ACTUAL USD BALANCE
@@ -191,7 +31,7 @@ RISK_PER_TRADE = 0.02               # 2% risk per trade for position sizing
 #     except Exception:
 #         return STARTING_BALANCE_USD
 
-# === Position Tracking Class with Portfolio Management ===
+# === Position Tracker Class ===
 class PositionTracker:
     def __init__(self):
         self.positions = {}  # {pair: {"entry_price": price, "quantity": qty, "timestamp": time}}
@@ -793,14 +633,14 @@ async def run_bot():
             print(f"⚠️ Error processing {pair}: {e}", flush=True)
     
     # Export all data for dashboard
-    try:
-        export_portfolio_data(position_tracker)
-        export_positions_data(position_tracker)
-        export_signals_data(signals_data)
-        export_trade_history(position_tracker)
-        commit_data_to_github()
-    except Exception as e:
-        print(f"⚠️ Error exporting dashboard data: {e}", flush=True)
+    # try:
+    #     export_portfolio_data(position_tracker)
+    #     export_positions_data(position_tracker)
+    #     export_signals_data(signals_data)
+    #     export_trade_history(position_tracker)
+    #     commit_data_to_github()
+    # except Exception as e:
+    #     print(f"⚠️ Error exporting dashboard data: {e}", flush=True)
     
     # Print trading summary after analyzing all pairs
     position_tracker.print_summary()
